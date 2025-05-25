@@ -45,7 +45,6 @@ int main(int argc, char *argv[]) {
             case 'h':
                 print_help_general();
                 return 1;
-                break;
             case 'q':
                 quiet_flag = 1;
                 break;
@@ -86,7 +85,7 @@ int main(int argc, char *argv[]) {
     if (hash_file.is_open()) {
         std::string curr_line;
         while (std::getline(hash_file, curr_line))
-            hashes.insert(trim_str(curr_line));
+            hashes.insert(trim_wspace(curr_line));
     } else {
         hashes.insert(hash_or_hashfile);
     }

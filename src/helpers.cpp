@@ -1,6 +1,11 @@
 #include "helpers.hpp"
+#include "globals.hpp"
+#include <cstdio>
+#include <cstdlib>
+#include <openssl/evp.h>
+#include <string>
 
-std::string trim_str(const std::string &str, const std::string &whitespace) {
+std::string trim_wspace(const std::string &str, const std::string &whitespace) {
     const auto str_begin = str.find_first_not_of(whitespace);
     if (str_begin == std::string::npos)
         return "";
@@ -15,3 +20,12 @@ void print_help_general() {
                     "[options]... hashfile dictionary|mask\n");
 }
 
+const EVP_MD *hash_mode_to_EVP_MD() {
+    switch (hash_type) {
+        case 0:
+            return EVP_md5();
+        default:
+            fprintf(stderr, "Invalid hash type %d", hash_type);
+            exit(1);
+    }
+};

@@ -8,5 +8,5 @@ struct EVP_free {
 
 template <typename T> using EVP_ptr = std::unique_ptr<T, EVP_free>;
 
-bool compute_hash(const char *input, int input_len, std::string &hashed_str,
+bool compute_hash(std::string input, std::string &hashed_str,
                   const EVP_MD *hash_type);

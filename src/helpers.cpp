@@ -16,7 +16,7 @@ std::string trim_wspace(const std::string &str, const std::string &whitespace) {
 }
 
 void print_help_general() {
-    fprintf(stdout, "Usage: shikacracker -m <hash_type> -a <attack_mode> "
+    fprintf(stdout, "Usage: ./shikacracker -m <hash_type> -a <attack_mode> "
                     "[options]... hashfile dictionary|mask\n");
 }
 

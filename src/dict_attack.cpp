@@ -7,6 +7,7 @@
 #include <fstream>
 #include <openssl/evp.h>
 #include <string>
+#include <unordered_set>
 
 void dict_attack(std::unordered_set<std::string> &hashes) {
     std::ifstream dict_file(dict);
@@ -35,4 +36,8 @@ void dict_attack(std::unordered_set<std::string> &hashes) {
         fprintf(stderr, "Dictionary file %s could not be opened", dict.c_str());
         exit(1);
     }
+}
+
+void hash_thread(std::unordered_set<std::string> &hashes) {
+
 }

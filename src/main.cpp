@@ -1,4 +1,5 @@
 #include "dict_attack.hpp"
+#include "entry_buffer.hpp"
 #include "globals.hpp"
 #include "helpers.hpp"
 #include <cstdio>
@@ -14,7 +15,7 @@ int atk_mode = -1;
 std::string mask;
 std::string dict;
 
-char mask_regex[] = "[^\\]?(\?.)";
+// char mask_regex[] = "[^\\]?(\?.)";
 
 int main(int argc, char *argv[]) {
     int opt_char;
@@ -97,3 +98,59 @@ int main(int argc, char *argv[]) {
         mask = argv[argc - 1];
     }
 }
+
+// #include <vector>
+// #include <iostream>
+// #include <optional>
+// #include <thread>
+// #include <atomic>
+
+// Buffer testing lmao
+// int main() {
+//     const int n = 12000;
+//     std::atomic_int num = 0;
+//     EntryBuffer<int> test(n);
+//     std::vector<std::thread> producers(n);
+//     std::vector<std::thread> consumers(n * 2);
+//     std::vector<int> res(n);
+//
+//     for (int i = 0; i < n; i++) {
+//         producers[i] = std::thread([&test, &num] {
+//             for (int j = 0; j < n; j++) {
+//                 test.add_item(j);
+//                 num++;
+//                 if (num == n * n)
+//                     test.add_done();
+//             }
+//         });
+//     }
+//
+//     for (int i = 0; i < n * 2; i++) {
+//         consumers[i] = std::thread([&test, &res] {
+//             for (int j = 0; j < n * 3 / 2; j++) {
+//                 std::optional<int> item = test.remove_item(res);
+//                 if (item == std::nullopt) {
+//                     break;
+//                 }
+//             }
+//         });
+//     }
+//
+//     for (int i = 0; i < n; i++) {
+//         producers[i].join();
+//         consumers[i].join();
+//     }
+//     for (int j = n; j < n * 2; j++) {
+//         consumers[j].join();
+//     }
+//
+//     for (int i = 0; i < n; i++) {
+//         if (res[i] != n) {
+//             std::cout << "you messed up\n";
+//             return 1;
+//         }
+//     }
+//     std::cout << "nice\n";
+//
+//     return 0;
+// }

@@ -10,6 +10,9 @@ template <typename T> class entry_buffer {
     // Maximum number of items that the buffer can hold
     int max_size() { return buf_size; }
 
+    // Add an item to the buffer
+    // Returns true if the item was successfully added,
+    // or false otherwise.
     bool add_item(T item) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [this] { return full() == false || done; });
@@ -27,6 +30,9 @@ template <typename T> class entry_buffer {
         return true;
     }
 
+    // Remove an item from the buffer.
+    // Returns the removed item if successful,
+    // or std::nullopt otherwise
     std::optional<T> remove_item() {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [this] { return empty() == false || done; });

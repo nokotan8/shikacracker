@@ -6,11 +6,10 @@
 #include <fstream>
 #include <getopt.h>
 #include <string>
-#include <unordered_set>
 
 int quiet_flag = 0;
 int num_threads = 1;
-int hash_type = -1;
+int hash_mode = -1;
 int atk_mode = -1;
 std::string mask;
 std::string dict;
@@ -51,7 +50,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'm':
                 try {
-                    hash_type = std::stoi(optarg);
+                    hash_mode = std::stoi(optarg);
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -m must be an integer\n");
                     return 1;
@@ -80,32 +79,35 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::unordered_set<std::string> hashes;
+    concurrent_set<std::string> input_hashes;
     std::string hash_or_hashfile = argv[argc - 2];
     std::ifstream hash_file(hash_or_hashfile);
     if (hash_file.is_open()) {
         std::string curr_line;
-        while (std::getline(hash_file, curr_line))
-            hashes.insert(trim_wspace(curr_line));
+        while (std::getline(hash_file, curr_line)) {
+            input_hashes.insert(curr_line);
+        }
     } else {
-        hashes.insert(hash_or_hashfile);
+        input_hashes.insert(hash_or_hashfile);
     }
 
-    if (atk_mode == 0) {
+    if (atk_mode == 0) { // Dictionary attack
         dict = argv[argc - 1];
-        dict_attack(hashes);
-    } else if (atk_mode == 3) {
+        dict_attack(input_hashes);
+    } else if (atk_mode == 3) { // Mask attack
         mask = argv[argc - 1];
     }
+
+    return 0;
 }
 
+/* Buffer testing lmao */
 // #include <vector>
 // #include <iostream>
 // #include <optional>
 // #include <thread>
 // #include <atomic>
 
-// Buffer testing lmao
 // int main() {
 //     const int n = 12000;
 //     std::atomic_int num = 0;

@@ -1,4 +1,4 @@
+#include "concurrent_set.hpp"
 #include <string>
-#include <unordered_set>
 
-void dict_attack(std::unordered_set<std::string> &hashes);
+void dict_attack(concurrent_set<std::string> &hashes);

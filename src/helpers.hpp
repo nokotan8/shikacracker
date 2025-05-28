@@ -9,4 +9,6 @@ void print_help_general();
 std::string trim_wspace(const std::string &str,
                         const std::string &whitespace = " \t");
 
+// Convert hash_mode argument to EVP_MD *
+// that can be passed into compute_hash
 const EVP_MD *hash_mode_to_EVP_MD();

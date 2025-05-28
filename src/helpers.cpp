@@ -21,11 +21,11 @@ void print_help_general() {
 }
 
 const EVP_MD *hash_mode_to_EVP_MD() {
-    switch (hash_type) {
+    switch (hash_mode) {
         case 0:
             return EVP_md5();
         default:
-            fprintf(stderr, "Invalid hash type %d", hash_type);
+            fprintf(stderr, "Invalid hash type %d", hash_mode);
             exit(1);
     }
 };

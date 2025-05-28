@@ -1,12 +1,11 @@
 #include <condition_variable>
 #include <mutex>
 #include <optional>
-#include <vector>
 
-template <typename T> class EntryBuffer {
+template <typename T> class entry_buffer {
   public:
-    EntryBuffer(int n) : buf_size(n), buffer(new T[n]) {}
-    ~EntryBuffer() = default;
+    entry_buffer(int n) : buf_size(n), buffer(new T[n]) {}
+    ~entry_buffer() = default;
 
     // Maximum number of items that the buffer can hold
     int max_size() { return buf_size; }
@@ -19,14 +18,16 @@ template <typename T> class EntryBuffer {
             return false;
 
         buffer[write_i] = item;
-        write_i = (write_i + 1) % buf_size;
+        write_i++;
+        write_i %= buf_size;
+
         lock.unlock();
         cv.notify_one();
 
         return true;
     }
 
-    std::optional<T> remove_item(std::vector<int> &res) {
+    std::optional<T> remove_item() {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [this] { return empty() == false || done; });
 
@@ -37,8 +38,8 @@ template <typename T> class EntryBuffer {
         }
 
         T item = buffer[read_i];
-        res[item]++;
-        read_i = (read_i + 1) % buf_size;
+        read_i++;
+        read_i %= buf_size;
 
         lock.unlock();
         cv.notify_one();
@@ -46,9 +47,9 @@ template <typename T> class EntryBuffer {
         return item;
     }
 
-    // Adding/producing items is complete. After calling this,
-    // further calls to EntryBuffer::add_item() will fail.
-    void add_done() {
+    // Adding/producing items is finished. After calling this,
+    // further calls to entry_buffer::add_item() will fail.
+    void finished_add() {
         std::unique_lock<std::mutex> lock(mtx);
         done = true;
         lock.unlock();

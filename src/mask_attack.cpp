@@ -1,36 +1,10 @@
 #include "mask_attack.hpp"
-#include "charsets.hpp"
+#include "charset.hpp"
 #include "globals.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-// Converts a charset identifier, i.e. the char
-// inputted by the user after '?', to a list of
-// all characters in that charset in std::string format.
-const std::string &get_charset(char identifier) {
-    switch (identifier) {
-        case 'l':
-            return ALPHA_LOWER;
-        case 'u':
-            return ALPHA_UPPER;
-        case 'd':
-            return DIGITS;
-        case 's':
-            return SYMBOLS;
-        case 'h':
-            return HEX_LOWER;
-        case 'H':
-            return HEX_UPPER;
-        case 'n':
-            return ALPHANUM;
-        case 'a':
-            return ALL_CHARS;
-        default:
-            return NO_CHARS;
-    }
-}
 
 // Converts user-inputted mask string into a vector
 // of strings, where each string represents the possible

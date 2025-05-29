@@ -12,6 +12,7 @@ add_executable(shikacracker
     src/hash.cpp
     src/dict_attack.cpp
     src/mask_attack.cpp
+    src/charset.cpp
 )
 target_link_libraries(shikacracker 
     OpenSSL::Crypto

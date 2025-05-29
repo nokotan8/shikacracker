@@ -1,4 +1,5 @@
 /* Charsets that are used during mask attacks, etc. */
+#pragma once
 #include <string>
 
 // Default charsets. Equivalent to those found in hashcat:

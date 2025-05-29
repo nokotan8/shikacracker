@@ -1,3 +1,4 @@
+#pragma once
 #include "concurrent_set.hpp"
 #include <string>
 

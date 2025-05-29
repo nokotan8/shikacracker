@@ -1,17 +1,24 @@
 #include "mask_attack.hpp"
 #include "charset.hpp"
+#include "concurrent_set.hpp"
+#include "entry_buffer.hpp"
 #include "globals.hpp"
-#include <iostream>
+#include "hash.hpp"
+#include "helpers.hpp"
+#include <openssl/evp.h>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
-// Converts user-inputted mask string into a vector
-// of strings, where each string represents the possible
-// character(s) at each position.
+/**
+ * Converts user-inputted mask string into a vector
+ * of strings, where each string represents the possible
+ * character(s) at each position.
+ */
 const std::vector<std::string> parse_mask() {
     std::vector<std::string> res;
-    for (long unsigned int i = 0; i < mask.size(); i++) {
+    for (size_t i = 0; i < mask.size(); i++) {
         if (mask[i] == '\\') {
             if (i < mask.size() - 1) {
                 if (mask[i + 1] == '?') {
@@ -48,16 +55,61 @@ const std::vector<std::string> parse_mask() {
             res.push_back(std::string(1, mask[i]));
         }
     }
+
     return res;
 }
 
-// Perform a mask attack, similar to:
-// https://hashcat.net/wiki/doku.php?id=mask_attack
+void generate_pwd_candidates(std::string &curr_str,
+                             std::vector<std::string> &mask_format,
+                             entry_buffer<std::string> &buffer, int i,
+                             concurrent_set<std::string> &input_hashes) {
+    const int n = mask_format.size();
+    if (i == n) {
+        if (input_hashes.empty())
+            buffer.finished_add();
+        buffer.add_item(curr_str);
+        return;
+    }
+
+    for (char c : mask_format[i]) {
+        curr_str[i] = c;
+        generate_pwd_candidates(curr_str, mask_format, buffer, i + 1,
+                                input_hashes);
+    }
+
+    return;
+}
+
+/**
+ * Performs a mask attack, similar to:
+ * https://hashcat.net/wiki/doku.php?id=mask_attack
+ */
 void mask_attack(concurrent_set<std::string> &input_hashes) {
     std::vector<std::string> mask_format = parse_mask();
-    for (auto &s : mask_format) {
-        for (char c : s)
-            std::cout << c << ' ';
-        std::cout << '\n';
+
+    std::vector<std::thread> cracker_threads(num_threads);
+    entry_buffer<std::string> buffer(num_threads * 2);
+    const EVP_MD *hash_type = hash_mode_to_EVP_MD();
+
+    for (int i = 0; i < num_threads; i++) {
+        cracker_threads[i] = std::thread(hash_thread, std::ref(buffer),
+                                         std::ref(input_hashes), hash_type);
     }
+
+    std::string curr_str(mask_format.size(), '\0');
+    generate_pwd_candidates(curr_str, mask_format, buffer, 0, input_hashes);
+    buffer.finished_add();
+
+    for (int i = 0; i < num_threads; i++) {
+        cracker_threads[i].join();
+    }
+
+    if (input_hashes.size() != 0) {
+        fprintf(stdout, "Hashes not cracked:\n");
+        for (const auto &hash : input_hashes.set) {
+            fprintf(stdout, "%s\n", hash.c_str());
+        }
+    }
+
+    return;
 }

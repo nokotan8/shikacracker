@@ -1,7 +1,24 @@
 #include "hash.hpp"
+#include "globals.hpp"
 #include <cstdio>
 #include <openssl/evp.h>
 #include <string>
+
+const EVP_MD *hash_mode_to_EVP_MD() {
+    switch (hash_mode) {
+        case 0:
+            return EVP_md5();
+        case 1:
+            return EVP_sha1();
+        case 2:
+            return EVP_sha256();
+        default:
+            fprintf(stderr, "Invalid hash type %d", hash_mode);
+            exit(1);
+    }
+
+    return nullptr;
+};
 
 bool compute_hash(std::string input, std::string &hashed_str,
                   const EVP_MD *hash_type) {

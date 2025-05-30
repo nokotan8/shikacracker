@@ -11,6 +11,10 @@ struct EVP_free {
 
 template <typename T> using EVP_ptr = std::unique_ptr<T, EVP_free>;
 
+// Convert hash_mode argument to EVP_MD *
+// that can be passed into compute_hash
+const EVP_MD *hash_mode_to_EVP_MD();
+
 bool compute_hash(std::string input, std::string &hashed_str,
                   const EVP_MD *hash_type);
 

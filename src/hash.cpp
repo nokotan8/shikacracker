@@ -12,6 +12,8 @@ const EVP_MD *hash_mode_to_EVP_MD() {
             return EVP_sha1();
         case 2:
             return EVP_sha256();
+        case 3:
+            return EVP_sha512();
         default:
             fprintf(stderr, "Invalid hash type %d", hash_mode);
             exit(1);
@@ -20,8 +22,8 @@ const EVP_MD *hash_mode_to_EVP_MD() {
     return nullptr;
 };
 
-bool compute_hash(std::string input, std::string &hashed_str,
-                  const EVP_MD *hash_type) {
+bool compute_hash_openssl(const char *input, size_t input_len,
+                          std::string &hashed_str, const EVP_MD *hash_type) {
     EVP_ptr<EVP_MD_CTX> context(EVP_MD_CTX_new());
 
     if (context.get() == nullptr) {
@@ -32,7 +34,7 @@ bool compute_hash(std::string input, std::string &hashed_str,
         return false;
     }
 
-    if (EVP_DigestUpdate(context.get(), input.c_str(), input.size()) == 0) {
+    if (EVP_DigestUpdate(context.get(), input, input_len) == 0) {
         return false;
     }
 
@@ -50,6 +52,17 @@ bool compute_hash(std::string input, std::string &hashed_str,
     hashed_str.pop_back();
 
     return true;
+}
+
+bool compute_hash(std::string input, std::string &hashed_str,
+                  const EVP_MD *hash_type) {
+    return compute_hash_openssl(input.c_str(), input.length(), hashed_str,
+                                hash_type);
+}
+
+bool compute_hash(const char *input, size_t input_len, std::string &hashed_str,
+                  const EVP_MD *hash_type) {
+    return compute_hash_openssl(input, input_len, hashed_str, hash_type);
 }
 
 void hash_thread(entry_buffer<std::string> &buffer,

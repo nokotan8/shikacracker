@@ -18,6 +18,9 @@ const EVP_MD *hash_mode_to_EVP_MD();
 bool compute_hash(std::string input, std::string &hashed_str,
                   const EVP_MD *hash_type);
 
+bool compute_hash(const char *input, size_t input_len, std::string &hashed_str,
+                  const EVP_MD *hash_type);
+
 void hash_thread(entry_buffer<std::string> &buffer,
                  concurrent_set<std::string> &input_hashes,
                  const EVP_MD *hash_type);

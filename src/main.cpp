@@ -1,4 +1,4 @@
-#include "charsets.hpp"
+#include "charset.hpp"
 #include "dict_attack.hpp"
 #include "globals.hpp"
 #include "helpers.hpp"
@@ -10,7 +10,7 @@
 #include <string>
 
 int quiet_flag = 0;
-int num_threads = 1;
+int num_threads = 4;
 int hash_mode = -1;
 int atk_mode = -1;
 std::string mask;
@@ -71,6 +71,10 @@ int main(int argc, char *argv[]) {
             case 't':
                 try {
                     num_threads = std::stoi(optarg);
+                    if (num_threads < 1) {
+                        fprintf(stderr, "Argument to -t must be 1 or more\n");
+                        return 1;
+                    }
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -t must be an integer\n");
                     return 1;

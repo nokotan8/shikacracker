@@ -1,5 +1,6 @@
 #pragma once
 #include <condition_variable>
+#include <iostream>
 #include <mutex>
 #include <optional>
 
@@ -18,8 +19,11 @@ template <typename T> class entry_buffer {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [this] { return full() == false || done; });
 
-        if (done)
+        if (done) {
+            lock.unlock();
+            cv.notify_one();
             return false;
+        }
 
         buffer[write_i] = item;
         write_i++;
@@ -59,6 +63,7 @@ template <typename T> class entry_buffer {
     void finished_add() {
         std::unique_lock<std::mutex> lock(mtx);
         done = true;
+        cv.notify_one();
         lock.unlock();
     }
 

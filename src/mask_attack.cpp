@@ -71,7 +71,6 @@ void generate_pwd_candidates_cont(std::string &curr_str,
             buffer.finished_add();
         else
             buffer.add_item(curr_str);
-        // fprintf(stdout, "%s\n", curr_str.c_str());
         return;
     }
 
@@ -161,7 +160,6 @@ void mask_attack(concurrent_set<std::string> &input_hashes) {
     std::string curr_str(mask_format.size(), '\0');
     generate_pwd_candidates(curr_str, mask_format, buffer, input_hashes);
     buffer.finished_add();
-    // std::cout << "hi\n";
 
     for (auto &thread : cracker_threads) {
         thread.join();

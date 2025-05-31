@@ -1,12 +1,11 @@
 #include "mask_attack.hpp"
-#include "charset.hpp"
+#include "charsets.hpp"
 #include "concurrent_set.hpp"
 #include "entry_buffer.hpp"
 #include "globals.hpp"
 #include "hash.hpp"
 #include <algorithm>
 #include <functional>
-#include <iostream>
 #include <openssl/evp.h>
 #include <stdexcept>
 #include <string>
@@ -40,7 +39,7 @@ const std::vector<std::string> parse_mask() {
             }
         } else if (mask[i] == '?') {
             if (i < mask.size() - 1) {
-                std::string charset = get_charset(mask[i + 1]);
+                const std::string &charset = get_charset(mask[i + 1]);
                 if (charset.size() > 0) {
                     res.push_back(charset);
                     i++;

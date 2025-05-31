@@ -1,9 +1,10 @@
-#include "charset.hpp"
+#include "charsets.hpp"
 #include "dict_attack.hpp"
 #include "globals.hpp"
 #include "helpers.hpp"
 #include "mask_attack.hpp"
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <getopt.h>
 #include <stdexcept>
@@ -15,10 +16,6 @@ int hash_mode = -1;
 int atk_mode = -1;
 std::string mask;
 std::string dict;
-std::string CUSTOM_CHARSET1 = "";
-std::string CUSTOM_CHARSET2 = "";
-std::string CUSTOM_CHARSET3 = "";
-std::string CUSTOM_CHARSET4 = "";
 
 int main(int argc, char *argv[]) {
     int opt_char;
@@ -28,6 +25,7 @@ int main(int argc, char *argv[]) {
         {"hash-type", required_argument, 0, 'm'},
         {"attack-mode", required_argument, 0, 'a'},
         {"threads", required_argument, 0, 't'},
+        {"freq-file", required_argument, 0, 'f'},
         {"custom-charset1", required_argument, 0, '1'},
         {"custom-charset2", required_argument, 0, '2'},
         {"custom-charset3", required_argument, 0, '3'},
@@ -80,6 +78,13 @@ int main(int argc, char *argv[]) {
                     return 1;
                 }
                 break;
+            case 'f':
+                try {
+                    std::filesystem::path freq_file = optarg;
+                    order_charsets(freq_file);
+                } catch (std::invalid_argument &err) {
+                    fprintf(stderr, "Error: %s", err.what());
+                }
             case '?':
                 break;
             default:

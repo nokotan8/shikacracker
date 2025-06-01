@@ -77,6 +77,10 @@ Generate all strings of length 6 where each character is a digit from 0-9, i.e.
 
 Hash each of them and check if the hash exists in `hashes.txt`.
 
+## Performance & Benchmarks
+
+See [benckmarks.md](/performance.md). Currently incomplete.
+
 ## Legal Disclaimer
 
 This project is provided for educational and ethical research purposes only.

@@ -10,8 +10,10 @@
 #include <stdexcept>
 #include <string>
 
+enum help_types { HELP_HASH_TYPE = 1000, HELP_ATTACK_MODE };
+
 int quiet_flag = 0;
-int num_threads = 4;
+int num_threads = 2;
 int hash_mode = -1;
 int atk_mode = -1;
 std::string mask;
@@ -21,11 +23,13 @@ int main(int argc, char *argv[]) {
     int opt_char;
     static struct option long_opts[] = {
         {"help", no_argument, 0, 'h'},
+        {"help-hash", no_argument, 0, HELP_HASH_TYPE},
+        {"help-mode", no_argument, 0, HELP_ATTACK_MODE},
         {"quiet", no_argument, 0, 'q'},
         {"hash-type", required_argument, 0, 'm'},
         {"attack-mode", required_argument, 0, 'a'},
         {"threads", required_argument, 0, 't'},
-        {"freq-file", required_argument, 0, 'f'},
+        {"char-order", required_argument, 0, 'c'},
         {"custom-charset1", required_argument, 0, '1'},
         {"custom-charset2", required_argument, 0, '2'},
         {"custom-charset3", required_argument, 0, '3'},
@@ -35,8 +39,8 @@ int main(int argc, char *argv[]) {
     };
     while (1) {
         int opt_index = 0;
-        opt_char =
-            getopt_long(argc, argv, "hqm:a:t:1:2:3:4:", long_opts, &opt_index);
+        opt_char = getopt_long(argc, argv, "hqm:a:t:c:1:2:3:4:", long_opts,
+                               &opt_index);
 
         if (opt_char == -1)
             break;
@@ -45,14 +49,24 @@ int main(int argc, char *argv[]) {
             case 0:
                 break;
             case 'h':
-                print_help_general();
+                print_help_general(argv[0]);
                 return 1;
+            case HELP_HASH_TYPE:
+                fprintf(stdout, "hash type help");
+                break;
+            case HELP_ATTACK_MODE:
+                fprintf(stdout, "attack mode help");
+                break;
             case 'q':
                 quiet_flag = 1;
                 break;
             case 'm':
                 try {
                     hash_mode = std::stoi(optarg);
+                    if (hash_mode < 0) {
+                        fprintf(stderr, "Argument to -m must be 0 or more\n");
+                        return 1;
+                    }
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -m must be an integer\n");
                     return 1;
@@ -61,6 +75,10 @@ int main(int argc, char *argv[]) {
             case 'a':
                 try {
                     atk_mode = std::stoi(optarg);
+                    if (atk_mode < 0) {
+                        fprintf(stderr, "Argument to -a must be 0 or more\n");
+                        return 1;
+                    }
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -a must be an integer\n");
                     return 1;

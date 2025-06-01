@@ -10,7 +10,11 @@
 #include <stdexcept>
 #include <string>
 
-enum help_types { HELP_HASH_TYPE = 1000, HELP_ATTACK_MODE };
+enum help_types {
+    HELP_HASH_TYPE = 1000,
+    HELP_ATTACK_MODE,
+    HELP_MASK
+};
 
 int quiet_flag = 0;
 int num_threads = 2;
@@ -25,6 +29,7 @@ int main(int argc, char *argv[]) {
         {"help", no_argument, 0, 'h'},
         {"help-hash", no_argument, 0, HELP_HASH_TYPE},
         {"help-mode", no_argument, 0, HELP_ATTACK_MODE},
+        {"help-mask", no_argument, 0, HELP_MASK},
         {"quiet", no_argument, 0, 'q'},
         {"hash-type", required_argument, 0, 'm'},
         {"attack-mode", required_argument, 0, 'a'},
@@ -50,13 +55,16 @@ int main(int argc, char *argv[]) {
                 break;
             case 'h':
                 print_help_general(argv[0]);
-                return 1;
+                return 0;
             case HELP_HASH_TYPE:
-                fprintf(stdout, "hash type help");
-                break;
+                print_help_hash();
+                return 0;
             case HELP_ATTACK_MODE:
-                fprintf(stdout, "attack mode help");
-                break;
+                print_help_mode();
+                return 0;
+            case HELP_MASK:
+                print_help_mask();
+                return 0;
             case 'q':
                 quiet_flag = 1;
                 break;

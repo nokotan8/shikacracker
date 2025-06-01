@@ -17,6 +17,11 @@ void print_help_hash();
 void print_help_mode();
 
 /**
+ * Prints information about how to format masks, invoked with "--help-mask"
+ */
+void print_help_mask();
+
+/**
  * Remove leading and trailing whitespace from a string.
  * Taken from https://stackoverflow.com/a/1798170
  */

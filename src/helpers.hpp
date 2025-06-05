@@ -1,4 +1,6 @@
-#include <string>
+/**
+ * Functions for printing help info to the console.
+ */
 
 /**
  * Prints general help, invoked with "-h/--help"
@@ -20,10 +22,3 @@ void print_help_mode();
  * Prints information about how to format masks, invoked with "--help-mask"
  */
 void print_help_mask();
-
-/**
- * Remove leading and trailing whitespace from a string.
- * Taken from https://stackoverflow.com/a/1798170
- */
-std::string trim_wspace(const std::string &str,
-                        const std::string &whitespace = " \t");

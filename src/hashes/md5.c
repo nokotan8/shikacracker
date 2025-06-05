@@ -4,11 +4,40 @@
  */
 
 #include "md5.h"
+#include <assert.h>
+#include <openssl/md5.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define MD5_A 0x67452301
+#define MD5_B 0xefcdab89
+#define MD5_C 0x98badcfe
+#define MD5_D 0x10325476
+
+#define MD5_F(b, c, d) (((b) & (c)) | (~(b) & (d)))
+#define MD5_G(b, c, d) (((b) & (d)) | ((c) & ~(d)))
+#define MD5_H(b, c, d) ((b) ^ (c) ^ (d))
+#define MD5_I(b, c, d) ((c) ^ ((b) | ~(d)))
+
+/**
+ * op: one of MD5_[F|G|H|I]
+ * w: 32-bit word of 512-bit chunk
+ * s: number of times to left rotate
+ * t: constant used in the MD5 algorithm
+ */
+#define MD5_STEP(op, a, b, c, d, w, s, t)                                      \
+    {                                                                          \
+        a += ((w) + (t) + op((b), (c), (d)));                                  \
+        a = rotate_left32(a, s);                                               \
+        a += b;                                                                \
+    }
+
+uint32_t rotate_left32(const uint32_t x, const size_t n) {
+    return (x << n) | (x >> (32 - n));
+}
 
 void md5_init(md5_context *ctx) {
     if (ctx == NULL) {
@@ -25,33 +54,16 @@ void md5_init(md5_context *ctx) {
     ctx->D = (uint32_t)MD5_D;
 }
 
-void md5_update(md5_context *ctx, uint8_t *input, size_t input_len) {
-    uint32_t process_buf[16];
-    uint32_t offset = ctx->size % 64;
-    ctx->size += (uint64_t)input_len;
-
-    for (size_t i = 0; i < input_len; i++) {
-        ctx->input[offset++] = input[i];
-
-        if (offset % 64 == 0) {
-            for (size_t j = 0; j < 16; j++) {
-                process_buf[j] = (uint32_t)(ctx->input[j * 4]) |
-                                 (uint32_t)(ctx->input[j * 4 + 1]) << 8 |
-                                 (uint32_t)(ctx->input[j * 4 + 2]) << 16 |
-                                 (uint32_t)(ctx->input[j * 4 + 3]) << 24;
-            }
-            offset = 0;
-        }
-    }
-}
-
-void md5_final(md5_context *ctx, uint8_t *output) {}
-
 /**
  * Process a 512 bit chunk of data, passed in as
  * an array of 16 32-bit unsigned integers.
  */
 void md5_process(md5_context *ctx, uint32_t *input) {
+    if (ctx == NULL) {
+        fprintf(stderr, "md5_process: ctx is NULL");
+        return;
+    }
+
     uint32_t A = ctx->A;
     uint32_t B = ctx->B;
     uint32_t C = ctx->C;
@@ -130,4 +142,93 @@ void md5_process(md5_context *ctx, uint32_t *input) {
     ctx->B += B;
     ctx->C += C;
     ctx->D += D;
+}
+
+void md5_update(md5_context *ctx, uint8_t *input, size_t input_len) {
+    if (ctx == NULL) {
+        fprintf(stderr, "md5_process: ctx is NULL");
+        return;
+    }
+
+    uint32_t chunk[16]; // 512-bit chunk
+    uint32_t offset = ctx->size % 64;
+    ctx->size += (uint64_t)input_len;
+
+    for (size_t i = 0; i < input_len; i++) {
+        ctx->input[offset++] = input[i];
+
+        if (offset % 64 == 0) {
+            for (size_t j = 0; j < 16; j++) {
+                chunk[j] = (uint32_t)(ctx->input[j * 4]) |
+                           (uint32_t)(ctx->input[j * 4 + 1]) << 8 |
+                           (uint32_t)(ctx->input[j * 4 + 2]) << 16 |
+                           (uint32_t)(ctx->input[j * 4 + 3]) << 24;
+            }
+
+            md5_process(ctx, chunk);
+            offset = 0;
+        }
+    }
+}
+
+void md5_final(md5_context *ctx, uint8_t *output) {
+    if (ctx == NULL) {
+        fprintf(stderr, "md5_process: ctx is NULL");
+        return;
+    }
+
+    uint32_t chunk[16];
+    uint32_t offset = ctx->size % 64;
+    // Append 1 bit (0b1000000)
+    ctx->input[offset++] = (uint8_t)0x80;
+
+    if (offset > 56) {
+        while (offset % 64) {
+            ctx->input[offset++] = (uint8_t)0x00;
+        }
+        for (size_t i = 0; i < 16; i++) {
+            chunk[i] = (uint32_t)(ctx->input[i * 4]) |
+                       (uint32_t)(ctx->input[i * 4 + 1]) << 8 |
+                       (uint32_t)(ctx->input[i * 4 + 2]) << 16 |
+                       (uint32_t)(ctx->input[i * 4 + 3]) << 24;
+        }
+        md5_process(ctx, chunk);
+        offset = 0;
+    }
+
+    while (offset != 56) {
+        ctx->input[offset++] = (uint8_t)0x00;
+    }
+    assert(offset == 56);
+    for (size_t i = 0; i < 14; i++) {
+        chunk[i] = (uint32_t)(ctx->input[i * 4]) |
+                   (uint32_t)(ctx->input[i * 4 + 1]) << 8 |
+                   (uint32_t)(ctx->input[i * 4 + 2]) << 16 |
+                   (uint32_t)(ctx->input[i * 4 + 3]) << 24;
+    }
+    // Append length of original message to complete last 512-bit chunk
+    chunk[14] = (uint32_t)(ctx->size * 8);
+    chunk[15] = (uint32_t)((ctx->size * 8) >> 32);
+
+    md5_process(ctx, chunk);
+
+    // Copy to output buffer
+    output[0] = (uint8_t)((ctx->A & 0x000000FF));
+    output[1] = (uint8_t)((ctx->A & 0x0000FF00) >> 8);
+    output[2] = (uint8_t)((ctx->A & 0x00FF0000) >> 16);
+    output[3] = (uint8_t)((ctx->A & 0xFF000000) >> 24);
+    output[4] = (uint8_t)((ctx->B & 0x000000FF));
+    output[5] = (uint8_t)((ctx->B & 0x0000FF00) >> 8);
+    output[6] = (uint8_t)((ctx->B & 0x00FF0000) >> 16);
+    output[7] = (uint8_t)((ctx->B & 0xFF000000) >> 24);
+    output[8] = (uint8_t)((ctx->C & 0x000000FF));
+    output[9] = (uint8_t)((ctx->C & 0x0000FF00) >> 8);
+    output[10] = (uint8_t)((ctx->C & 0x00FF0000) >> 16);
+    output[11] = (uint8_t)((ctx->C & 0xFF000000) >> 24);
+    output[12] = (uint8_t)((ctx->D & 0x000000FF));
+    output[13] = (uint8_t)((ctx->D & 0x0000FF00) >> 8);
+    output[14] = (uint8_t)((ctx->D & 0x00FF0000) >> 16);
+    output[15] = (uint8_t)((ctx->D & 0xFF000000) >> 24);
+
+    return;
 }

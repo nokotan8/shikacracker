@@ -4,6 +4,7 @@
  */
 
 #include "md5.h"
+#include "../bitops.h"
 #include <assert.h>
 #include <openssl/md5.h>
 #include <stddef.h>
@@ -34,10 +35,6 @@
         a = rotate_left32(a, s);                                               \
         a += b;                                                                \
     }
-
-uint32_t rotate_left32(const uint32_t x, const size_t n) {
-    return (x << n) | (x >> (32 - n));
-}
 
 void md5_init(md5_context *ctx) {
     if (ctx == NULL) {

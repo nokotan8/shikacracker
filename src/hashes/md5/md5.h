@@ -10,7 +10,6 @@ typedef struct {
     uint32_t D;
 } md5_context;
 
-uint32_t rotate_left32(const uint32_t x, const size_t n);
 
 void md5_init(md5_context *ctx);
 void md5_update(md5_context *ctx, uint8_t *input, size_t input_len);

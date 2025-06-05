@@ -13,11 +13,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Constants used in the MD5 algorithm */
 #define MD5_A 0x67452301
 #define MD5_B 0xefcdab89
 #define MD5_C 0x98badcfe
 #define MD5_D 0x10325476
 
+/* Operations used at each 'step' in the algorithm */
 #define MD5_F(b, c, d) (((b) & (c)) | (~(b) & (d)))
 #define MD5_G(b, c, d) (((b) & (d)) | ((c) & ~(d)))
 #define MD5_H(b, c, d) ((b) ^ (c) ^ (d))
@@ -154,6 +156,7 @@ void md5_update(md5_context *ctx, uint8_t *input, size_t input_len) {
     for (size_t i = 0; i < input_len; i++) {
         ctx->input[offset++] = input[i];
 
+        // When input becomes full (512 bits), process a chunk
         if (offset % 64 == 0) {
             for (size_t j = 0; j < 16; j++) {
                 chunk[j] = (uint32_t)(ctx->input[j * 4]) |
@@ -179,6 +182,7 @@ void md5_final(md5_context *ctx, uint8_t *output) {
     // Append 1 bit (0b1000000)
     ctx->input[offset++] = (uint8_t)0x80;
 
+    // Append 0 bits until the total length in bytes ≡ 56 mod 64
     if (offset > 56) {
         while (offset % 64) {
             ctx->input[offset++] = (uint8_t)0x00;
@@ -196,7 +200,6 @@ void md5_final(md5_context *ctx, uint8_t *output) {
     while (offset != 56) {
         ctx->input[offset++] = (uint8_t)0x00;
     }
-    assert(offset == 56);
     for (size_t i = 0; i < 14; i++) {
         chunk[i] = (uint32_t)(ctx->input[i * 4]) |
                    (uint32_t)(ctx->input[i * 4 + 1]) << 8 |
@@ -210,16 +213,16 @@ void md5_final(md5_context *ctx, uint8_t *output) {
     md5_process(ctx, chunk);
 
     // Copy to output buffer
-    output[0] = (uint8_t)((ctx->A & 0x000000FF));
-    output[1] = (uint8_t)((ctx->A & 0x0000FF00) >> 8);
-    output[2] = (uint8_t)((ctx->A & 0x00FF0000) >> 16);
-    output[3] = (uint8_t)((ctx->A & 0xFF000000) >> 24);
-    output[4] = (uint8_t)((ctx->B & 0x000000FF));
-    output[5] = (uint8_t)((ctx->B & 0x0000FF00) >> 8);
-    output[6] = (uint8_t)((ctx->B & 0x00FF0000) >> 16);
-    output[7] = (uint8_t)((ctx->B & 0xFF000000) >> 24);
-    output[8] = (uint8_t)((ctx->C & 0x000000FF));
-    output[9] = (uint8_t)((ctx->C & 0x0000FF00) >> 8);
+    output[0]  = (uint8_t)((ctx->A & 0x000000FF));
+    output[1]  = (uint8_t)((ctx->A & 0x0000FF00) >> 8);
+    output[2]  = (uint8_t)((ctx->A & 0x00FF0000) >> 16);
+    output[3]  = (uint8_t)((ctx->A & 0xFF000000) >> 24);
+    output[4]  = (uint8_t)((ctx->B & 0x000000FF));
+    output[5]  = (uint8_t)((ctx->B & 0x0000FF00) >> 8);
+    output[6]  = (uint8_t)((ctx->B & 0x00FF0000) >> 16);
+    output[7]  = (uint8_t)((ctx->B & 0xFF000000) >> 24);
+    output[8]  = (uint8_t)((ctx->C & 0x000000FF));
+    output[9]  = (uint8_t)((ctx->C & 0x0000FF00) >> 8);
     output[10] = (uint8_t)((ctx->C & 0x00FF0000) >> 16);
     output[11] = (uint8_t)((ctx->C & 0xFF000000) >> 24);
     output[12] = (uint8_t)((ctx->D & 0x000000FF));

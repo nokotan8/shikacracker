@@ -20,7 +20,6 @@ int quiet_flag = 0;
 int num_threads = 2;
 int hash_mode = -1;
 int atk_mode = -1;
-std::string mask;
 std::string dict;
 
 int main(int argc, char *argv[]) {
@@ -134,9 +133,9 @@ int main(int argc, char *argv[]) {
         dict = argv[argc - 1];
         dict_attack(input_hashes);
     } else if (atk_mode == 3) { // Mask attack
-        mask = argv[argc - 1];
+        const std::string mask = argv[argc - 1];
         try {
-            mask_attack(input_hashes);
+            mask_attack(mask, input_hashes);
         } catch (std::invalid_argument &err) {
             fprintf(stderr, "Error: %s\n", err.what());
         }

@@ -3,36 +3,35 @@
 #include "concurrent_set.hpp"
 #include "entry_buffer.hpp"
 #include "globals.hpp"
+#include "opencl_setup.hpp"
 // #include "hash.hpp"
 
+#include <CL/cl.h>
+#include <CL/cl_platform.h>
+#include <CL/opencl.hpp>
+#include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 size_t parse_mask(const std::string &mask, char **charset,
-                  size_t **charset_offsets, size_t **charset_lengths,
-                  size_t *pwd_length) {
+                  unsigned int **charset_offsets,
+                  unsigned int **charset_lengths, unsigned int *pwd_length) {
     if (mask.empty()) {
         throw std::invalid_argument("mask must be at least 1 character long");
     } else if (pwd_length == NULL) {
         throw std::invalid_argument("pwd_length cannot be NULL");
     }
 
-    if (*charset == nullptr) {
-        free(*charset);
-        *charset = nullptr;
-    }
-    if (*charset_offsets == nullptr) {
-        free(*charset_offsets);
-        *charset_offsets = nullptr;
-    }
-    if (*charset_lengths == nullptr) {
-        free(*charset_lengths);
-        *charset_lengths = nullptr;
+    if (*charset != nullptr || *charset_offsets != nullptr ||
+        *charset_lengths != nullptr) {
+        throw std::invalid_argument(
+            "charset, charset_offsets and charset_lengths must be NULL");
     }
 
     // First get length of password and mask
@@ -72,13 +71,15 @@ size_t parse_mask(const std::string &mask, char **charset,
     if (*charset == nullptr) {
         throw std::bad_alloc();
     }
-    *charset_offsets = (size_t *)malloc(sizeof(size_t) * (*pwd_length));
+    *charset_offsets =
+        (unsigned int *)malloc(sizeof(unsigned int) * (*pwd_length));
     if (*charset_offsets == nullptr) {
         free(*charset);
         *charset = nullptr;
         throw std::bad_alloc();
     }
-    *charset_lengths = (size_t *)malloc(sizeof(size_t) * (*pwd_length));
+    *charset_lengths =
+        (unsigned int *)malloc(sizeof(unsigned int) * (*pwd_length));
     if (*charset_lengths == nullptr) {
         free(*charset);
         *charset = nullptr;
@@ -157,17 +158,35 @@ void generate_pwd_candidates(std::string &curr_str,
  */
 void mask_attack(const std::string &mask,
                  concurrent_set<std::string> &input_hashes) {
-    char *charset = nullptr;
-    size_t *charset_offsets = nullptr;
-    size_t *charset_lengths = nullptr;
-    size_t pwd_length;
+    char *charset_basis = nullptr;
+    unsigned int *charset_offsets = nullptr;
+    unsigned int *charset_lengths = nullptr;
+    unsigned int pwd_length;
 
-    size_t charset_len = parse_mask(mask, &charset, &charset_offsets,
-                                    &charset_lengths, &pwd_length);
+    size_t charset_len;
+    try {
+        charset_len = parse_mask(mask, &charset_basis, &charset_offsets,
+                                 &charset_lengths, &pwd_length);
+
+    } catch (std::invalid_argument &err) {
+        return;
+    } catch (std::bad_alloc &err) {
+        fprintf(stdout, "No memory in mask_attack");
+        return;
+    }
+
+    // Total number of password candidates that will be generated
+    size_t charset_space_size = 1;
+    for (size_t i = 0; i < pwd_length; i++) {
+        charset_space_size *= charset_lengths[i];
+    }
+
+    unsigned int block_size = 1024;
+    size_t digest_size = 16;
 
     /* For testing */
     // for (size_t i = 0; i < pwd_length; i++) {
-    //     fprintf(stdout, "%zu ", charset_offsets[i]);
+    //     fprintf(stdout, "%u ", charset_offsets[i]);
     // }
     // fprintf(stdout, "\n");
     //
@@ -177,35 +196,96 @@ void mask_attack(const std::string &mask,
     //         curr_pos++;
     //     }
     //
-    //     fprintf(stdout, "%c ", charset[i]);
+    //     fprintf(stdout, "%c ", charset_basis[i]);
     // }
     // fprintf(stdout, "\n");
 
-    // std::vector<std::thread> cracker_threads(num_threads);
-    // entry_buffer<std::string> buffer(num_threads * 4);
-    // const EVP_MD *hash_type = hash_mode_to_EVP_MD();
-    //
-    // for (int i = 0; i < num_threads; i++) {
-    //     cracker_threads[i] = std::thread(hash_thread, std::ref(buffer),
-    //                                      std::ref(input_hashes), hash_type);
-    // }
-    //
-    // std::string curr_str(mask_format.size(), '\0');
-    // generate_pwd_candidates(curr_str, mask_format, buffer, 0, input_hashes);
-    // buffer.finished_add();
-    //
-    // for (auto &thread : cracker_threads) {
-    //     thread.join();
-    // }
+    cl::Context context(cl::Device::getDefault());
+    cl::CommandQueue queue(context, cl::Device::getDefault());
 
-    // if (input_hashes.size() != 0) {
-    //     fprintf(stdout, "Hashes not cracked:\n");
-    //     for (const auto &hash : input_hashes.set) {
-    //         fprintf(stdout, "%s\n", hash.c_str());
-    //     }
-    // }
+    std::string kernel_code =
+        get_file_contents("../src/opencl/md5.cl") + "\n" +
+        get_file_contents("../src/opencl/mask_generate.cl");
 
-    free(charset);
+    cl::Program program(context, kernel_code);
+    try {
+        program.build(cl::Device::getDefault());
+    } catch (cl::BuildError &err) {
+        std::cout << " Error building: "
+                  << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
+                         {cl::Device::getDefault()})
+                  << "\n";
+        exit(1);
+    }
+
+    cl::Buffer charset_basis_d(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                               sizeof(cl_char) * charset_len, charset_basis);
+    cl::Buffer charset_offsets_d(context,
+                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_uint) * pwd_length, charset_offsets);
+    cl::Buffer charset_lengths_d(context,
+                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_uint) * pwd_length, charset_lengths);
+    cl::Buffer output_d(context, CL_MEM_WRITE_ONLY,
+                        sizeof(cl_uchar) * digest_size * block_size);
+
+    cl_uchar *output =
+        (cl_uchar *)malloc(sizeof(cl_uchar) * digest_size * block_size);
+    if (output == nullptr) {
+        free(charset_basis);
+        free(charset_offsets);
+        free(charset_lengths);
+        throw std::bad_alloc();
+    }
+
+    try {
+        size_t block_offset = 0;
+        size_t num_blocks = (charset_space_size + block_size - 1) / block_size;
+        cl::Kernel kernel(program, "generate_from_mask");
+        kernel.setArg(0, charset_basis_d);
+        kernel.setArg(1, charset_offsets_d);
+        kernel.setArg(2, charset_lengths_d);
+        kernel.setArg(3, pwd_length);
+        kernel.setArg(4, output_d);
+        kernel.setArg(5, (cl_uint)block_size);
+
+        for (size_t i = 0; i < num_blocks; i++, block_offset += block_size) {
+            size_t block_end =
+                std::min(block_size + block_offset, charset_space_size);
+            size_t num_hashes = block_end - block_offset;
+            // std::cout << block_offset << ' ' << block_end << '\n';
+
+            queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
+                                       cl::NDRange(block_end));
+
+            queue.enqueueReadBuffer(output_d, CL_TRUE, 0,
+                                    sizeof(cl_uchar) * digest_size * num_hashes,
+                                    output);
+
+            std::string digest_hex(digest_size * 2 + 1, '\0');
+            for (size_t i = 0; i < num_hashes; i++) {
+                size_t offset = i * digest_size;
+                for (size_t j = 0; j < digest_size; j++) {
+                    snprintf(&digest_hex[j * 2], 3, "%02x", output[j + offset]);
+                }
+
+                if (input_hashes.count(digest_hex)) {
+                    input_hashes.erase(digest_hex);
+                    fprintf(
+                        stdout,
+                        "Reverse of hash %s found: WAIT I GOTTA IMPL THIS\n",
+                        digest_hex.c_str());
+                    size_t gid = block_offset + i;
+                    std::cout << gid << '\n';
+                }
+            }
+        }
+    } catch (cl::Error &err) {
+        std::cout << "error: " << err.what() << '\n';
+    }
+
+    free(output);
+    free(charset_basis);
     free(charset_offsets);
     free(charset_lengths);
 

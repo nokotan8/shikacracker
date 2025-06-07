@@ -3,20 +3,16 @@
  * https://www.rfc-editor.org/rfc/rfc1321
  */
 
-typedef unsigned char uint8_t;
-typedef unsigned int uint32_t;
-typedef unsigned long uint64_t;
-
 typedef struct {
-    uint64_t size;     // total size of input
-    uint8_t input[64]; // current chunk
-    uint32_t A;
-    uint32_t B;
-    uint32_t C;
-    uint32_t D;
+    unsigned long size;     // total size of input
+    unsigned char input[64]; // current chunk
+    unsigned int A;
+    unsigned int B;
+    unsigned int C;
+    unsigned int D;
 } md5_context;
 
-uint32_t rotate_left32(const uint32_t x, const size_t n) {
+unsigned int rotate_left32(const unsigned int x, const size_t n) {
     return (x << n) | (x >> (32 - n));
 }
 
@@ -46,23 +42,23 @@ uint32_t rotate_left32(const uint32_t x, const size_t n) {
     }
 
 void md5_init(md5_context *ctx) {
-    ctx->size = (uint64_t)0;
+    ctx->size = (unsigned long)0;
 
-    ctx->A = (uint32_t)MD5_A;
-    ctx->B = (uint32_t)MD5_B;
-    ctx->C = (uint32_t)MD5_C;
-    ctx->D = (uint32_t)MD5_D;
+    ctx->A = (unsigned int)MD5_A;
+    ctx->B = (unsigned int)MD5_B;
+    ctx->C = (unsigned int)MD5_C;
+    ctx->D = (unsigned int)MD5_D;
 }
 
 /**
  * Process a 512 bit chunk of data, passed in as
  * an array of 16 32-bit unsigned integers.
  */
-void md5_process(md5_context *ctx, uint32_t *input) {
-    uint32_t A = ctx->A;
-    uint32_t B = ctx->B;
-    uint32_t C = ctx->C;
-    uint32_t D = ctx->D;
+void md5_process(md5_context *ctx, unsigned int *input) {
+    unsigned int A = ctx->A;
+    unsigned int B = ctx->B;
+    unsigned int C = ctx->C;
+    unsigned int D = ctx->D;
 
     // 0 ~ 15
     MD5_STEP(MD5_F, A, B, C, D, input[0], 7, 0xd76aa478L);
@@ -139,10 +135,10 @@ void md5_process(md5_context *ctx, uint32_t *input) {
     ctx->D += D;
 }
 
-void md5_update(md5_context *ctx, __constant const uint8_t *input, size_t input_len) {
-    uint32_t chunk[16]; // 512-bit chunk
-    uint32_t offset = ctx->size % 64;
-    ctx->size += (uint64_t)input_len;
+void md5_update(md5_context *ctx, const unsigned char *input, size_t input_len) {
+    unsigned int chunk[16]; // 512-bit chunk
+    unsigned int offset = ctx->size % 64;
+    ctx->size += (unsigned long)input_len;
 
     for (size_t i = 0; i < input_len; i++) {
         ctx->input[offset++] = input[i];
@@ -150,10 +146,10 @@ void md5_update(md5_context *ctx, __constant const uint8_t *input, size_t input_
         // When input becomes full (512 bits), process a chunk
         if (offset % 64 == 0) {
             for (size_t j = 0; j < 16; j++) {
-                chunk[j] = (uint32_t)(ctx->input[j * 4]) |
-                           (uint32_t)(ctx->input[j * 4 + 1]) << 8 |
-                           (uint32_t)(ctx->input[j * 4 + 2]) << 16 |
-                           (uint32_t)(ctx->input[j * 4 + 3]) << 24;
+                chunk[j] = (unsigned int)(ctx->input[j * 4]) |
+                           (unsigned int)(ctx->input[j * 4 + 1]) << 8 |
+                           (unsigned int)(ctx->input[j * 4 + 2]) << 16 |
+                           (unsigned int)(ctx->input[j * 4 + 3]) << 24;
             }
 
             md5_process(ctx, chunk);
@@ -162,64 +158,64 @@ void md5_update(md5_context *ctx, __constant const uint8_t *input, size_t input_
     }
 }
 
-void md5_final(md5_context *ctx, __global uint8_t *output) {
-    uint32_t chunk[16];
-    uint32_t offset = ctx->size % 64;
+void md5_final(md5_context *ctx, __global unsigned char *output) {
+    unsigned int chunk[16];
+    unsigned int offset = ctx->size % 64;
     // Append 1 bit (0b1000000)
-    ctx->input[offset++] = (uint8_t)0x80;
+    ctx->input[offset++] = (unsigned char)0x80;
 
     // Append 0 bits until the total length in bytes ≡ 56 mod 64
     if (offset > 56) {
         while (offset % 64) {
-            ctx->input[offset++] = (uint8_t)0x00;
+            ctx->input[offset++] = (unsigned char)0x00;
         }
         for (size_t i = 0; i < 16; i++) {
-            chunk[i] = (uint32_t)(ctx->input[i * 4]) |
-                       (uint32_t)(ctx->input[i * 4 + 1]) << 8 |
-                       (uint32_t)(ctx->input[i * 4 + 2]) << 16 |
-                       (uint32_t)(ctx->input[i * 4 + 3]) << 24;
+            chunk[i] = (unsigned int)(ctx->input[i * 4]) |
+                       (unsigned int)(ctx->input[i * 4 + 1]) << 8 |
+                       (unsigned int)(ctx->input[i * 4 + 2]) << 16 |
+                       (unsigned int)(ctx->input[i * 4 + 3]) << 24;
         }
         md5_process(ctx, chunk);
         offset = 0;
     }
 
     while (offset != 56) {
-        ctx->input[offset++] = (uint8_t)0x00;
+        ctx->input[offset++] = (unsigned char)0x00;
     }
     for (size_t i = 0; i < 14; i++) {
-        chunk[i] = (uint32_t)(ctx->input[i * 4]) |
-                   (uint32_t)(ctx->input[i * 4 + 1]) << 8 |
-                   (uint32_t)(ctx->input[i * 4 + 2]) << 16 |
-                   (uint32_t)(ctx->input[i * 4 + 3]) << 24;
+        chunk[i] = (unsigned int)(ctx->input[i * 4]) |
+                   (unsigned int)(ctx->input[i * 4 + 1]) << 8 |
+                   (unsigned int)(ctx->input[i * 4 + 2]) << 16 |
+                   (unsigned int)(ctx->input[i * 4 + 3]) << 24;
     }
     // Append length of original message to complete last 512-bit chunk
-    chunk[14] = (uint32_t)(ctx->size * 8);
-    chunk[15] = (uint32_t)((ctx->size * 8) >> 32);
+    chunk[14] = (unsigned int)(ctx->size * 8);
+    chunk[15] = (unsigned int)((ctx->size * 8) >> 32);
 
     md5_process(ctx, chunk);
 
     // Copy to output buffer
-    output[0]  = (uint8_t)((ctx->A & 0x000000FF));
-    output[1]  = (uint8_t)((ctx->A & 0x0000FF00) >> 8);
-    output[2]  = (uint8_t)((ctx->A & 0x00FF0000) >> 16);
-    output[3]  = (uint8_t)((ctx->A & 0xFF000000) >> 24);
-    output[4]  = (uint8_t)((ctx->B & 0x000000FF));
-    output[5]  = (uint8_t)((ctx->B & 0x0000FF00) >> 8);
-    output[6]  = (uint8_t)((ctx->B & 0x00FF0000) >> 16);
-    output[7]  = (uint8_t)((ctx->B & 0xFF000000) >> 24);
-    output[8]  = (uint8_t)((ctx->C & 0x000000FF));
-    output[9]  = (uint8_t)((ctx->C & 0x0000FF00) >> 8);
-    output[10] = (uint8_t)((ctx->C & 0x00FF0000) >> 16);
-    output[11] = (uint8_t)((ctx->C & 0xFF000000) >> 24);
-    output[12] = (uint8_t)((ctx->D & 0x000000FF));
-    output[13] = (uint8_t)((ctx->D & 0x0000FF00) >> 8);
-    output[14] = (uint8_t)((ctx->D & 0x00FF0000) >> 16);
-    output[15] = (uint8_t)((ctx->D & 0xFF000000) >> 24);
+    output[0]  = (unsigned char)((ctx->A & 0x000000FF));
+    output[1]  = (unsigned char)((ctx->A & 0x0000FF00) >> 8);
+    output[2]  = (unsigned char)((ctx->A & 0x00FF0000) >> 16);
+    output[3]  = (unsigned char)((ctx->A & 0xFF000000) >> 24);
+    output[4]  = (unsigned char)((ctx->B & 0x000000FF));
+    output[5]  = (unsigned char)((ctx->B & 0x0000FF00) >> 8);
+    output[6]  = (unsigned char)((ctx->B & 0x00FF0000) >> 16);
+    output[7]  = (unsigned char)((ctx->B & 0xFF000000) >> 24);
+    output[8]  = (unsigned char)((ctx->C & 0x000000FF));
+    output[9]  = (unsigned char)((ctx->C & 0x0000FF00) >> 8);
+    output[10] = (unsigned char)((ctx->C & 0x00FF0000) >> 16);
+    output[11] = (unsigned char)((ctx->C & 0xFF000000) >> 24);
+    output[12] = (unsigned char)((ctx->D & 0x000000FF));
+    output[13] = (unsigned char)((ctx->D & 0x0000FF00) >> 8);
+    output[14] = (unsigned char)((ctx->D & 0x00FF0000) >> 16);
+    output[15] = (unsigned char)((ctx->D & 0xFF000000) >> 24);
 
     return;
 }
 
-__kernel void compute_md5(__constant const uint8_t *input, const unsigned int input_len, __global uint8_t *output) {
+void compute_md5(const unsigned char *input, const unsigned int input_len, __global unsigned char *output) {
     md5_context ctx;
     md5_init(&ctx);
     md5_update(&ctx, input, input_len);

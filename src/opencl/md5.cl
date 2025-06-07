@@ -1,11 +1,12 @@
 /**
  * MD5 Message-Digest Algorithm, following RFC 1321 available at:
- * https://www.rfc-editor.org/rfc/rfc1321
+ * https://www.rfc-editor.org/rfc/rfc1321.
+ * For commented code, see src/hashes/md5/md5.*
  */
 
 typedef struct {
-    unsigned long size;     // total size of input
-    unsigned char input[64]; // current chunk
+    unsigned long size;
+    unsigned char input[64];
     unsigned int A;
     unsigned int B;
     unsigned int C;
@@ -16,29 +17,21 @@ unsigned int rotate_left32(const unsigned int x, const size_t n) {
     return (x << n) | (x >> (32 - n));
 }
 
-/* Constants used in the MD5 algorithm */
 #define MD5_A 0x67452301
 #define MD5_B 0xefcdab89
 #define MD5_C 0x98badcfe
 #define MD5_D 0x10325476
 
-/* Operations used at each 'step' in the algorithm */
 #define MD5_F(b, c, d) (((b) & (c)) | (~(b) & (d)))
 #define MD5_G(b, c, d) (((b) & (d)) | ((c) & ~(d)))
 #define MD5_H(b, c, d) ((b) ^ (c) ^ (d))
 #define MD5_I(b, c, d) ((c) ^ ((b) | ~(d)))
 
-/**
- * op: one of MD5_[F|G|H|I]
- * w: 32-bit word of 512-bit chunk
- * s: number of times to left rotate
- * t: constant used in the MD5 algorithm
- */
-#define MD5_STEP(op, a, b, c, d, w, s, t)                                      \
-    {                                                                          \
-        a += ((w) + (t) + op((b), (c), (d)));                                  \
-        a = rotate_left32(a, s);                                               \
-        a += b;                                                                \
+#define MD5_STEP(op, a, b, c, d, w, s, t)          \
+    {                                              \
+        a += ((w) + (t) + op((b), (c), (d)));      \
+        a = rotate_left32(a, s);                   \
+        a += b;                                    \
     }
 
 void md5_init(md5_context *ctx) {
@@ -50,17 +43,12 @@ void md5_init(md5_context *ctx) {
     ctx->D = (unsigned int)MD5_D;
 }
 
-/**
- * Process a 512 bit chunk of data, passed in as
- * an array of 16 32-bit unsigned integers.
- */
 void md5_process(md5_context *ctx, unsigned int *input) {
     unsigned int A = ctx->A;
     unsigned int B = ctx->B;
     unsigned int C = ctx->C;
     unsigned int D = ctx->D;
 
-    // 0 ~ 15
     MD5_STEP(MD5_F, A, B, C, D, input[0], 7, 0xd76aa478L);
     MD5_STEP(MD5_F, D, A, B, C, input[1], 12, 0xe8c7b756L);
     MD5_STEP(MD5_F, C, D, A, B, input[2], 17, 0x242070dbL);
@@ -77,7 +65,7 @@ void md5_process(md5_context *ctx, unsigned int *input) {
     MD5_STEP(MD5_F, D, A, B, C, input[13], 12, 0xfd987193L);
     MD5_STEP(MD5_F, C, D, A, B, input[14], 17, 0xa679438eL);
     MD5_STEP(MD5_F, B, C, D, A, input[15], 22, 0x49b40821L);
-    // 16 ~ 31
+
     MD5_STEP(MD5_G, A, B, C, D, input[1], 5, 0xf61e2562L);
     MD5_STEP(MD5_G, D, A, B, C, input[6], 9, 0xc040b340L);
     MD5_STEP(MD5_G, C, D, A, B, input[11], 14, 0x265e5a51L);
@@ -94,7 +82,7 @@ void md5_process(md5_context *ctx, unsigned int *input) {
     MD5_STEP(MD5_G, D, A, B, C, input[2], 9, 0xfcefa3f8L);
     MD5_STEP(MD5_G, C, D, A, B, input[7], 14, 0x676f02d9L);
     MD5_STEP(MD5_G, B, C, D, A, input[12], 20, 0x8d2a4c8aL);
-    // 32 ~ 47
+
     MD5_STEP(MD5_H, A, B, C, D, input[5], 4, 0xfffa3942L);
     MD5_STEP(MD5_H, D, A, B, C, input[8], 11, 0x8771f681L);
     MD5_STEP(MD5_H, C, D, A, B, input[11], 16, 0x6d9d6122L);
@@ -111,7 +99,7 @@ void md5_process(md5_context *ctx, unsigned int *input) {
     MD5_STEP(MD5_H, D, A, B, C, input[12], 11, 0xe6db99e5L);
     MD5_STEP(MD5_H, C, D, A, B, input[15], 16, 0x1fa27cf8L);
     MD5_STEP(MD5_H, B, C, D, A, input[2], 23, 0xc4ac5665L);
-    // 48 ~ 63
+
     MD5_STEP(MD5_I, A, B, C, D, input[0], 6, 0xf4292244L);
     MD5_STEP(MD5_I, D, A, B, C, input[7], 10, 0x432aff97L);
     MD5_STEP(MD5_I, C, D, A, B, input[14], 15, 0xab9423a7L);
@@ -135,15 +123,15 @@ void md5_process(md5_context *ctx, unsigned int *input) {
     ctx->D += D;
 }
 
-void md5_update(md5_context *ctx, const unsigned char *input, size_t input_len) {
-    unsigned int chunk[16]; // 512-bit chunk
+void md5_update(md5_context *ctx, const unsigned char *input,
+                size_t input_len) {
+    unsigned int chunk[16];
     unsigned int offset = ctx->size % 64;
     ctx->size += (unsigned long)input_len;
 
     for (size_t i = 0; i < input_len; i++) {
         ctx->input[offset++] = input[i];
 
-        // When input becomes full (512 bits), process a chunk
         if (offset % 64 == 0) {
             for (size_t j = 0; j < 16; j++) {
                 chunk[j] = (unsigned int)(ctx->input[j * 4]) |
@@ -161,10 +149,8 @@ void md5_update(md5_context *ctx, const unsigned char *input, size_t input_len) 
 void md5_final(md5_context *ctx, __global unsigned char *output) {
     unsigned int chunk[16];
     unsigned int offset = ctx->size % 64;
-    // Append 1 bit (0b1000000)
     ctx->input[offset++] = (unsigned char)0x80;
 
-    // Append 0 bits until the total length in bytes ≡ 56 mod 64
     if (offset > 56) {
         while (offset % 64) {
             ctx->input[offset++] = (unsigned char)0x00;
@@ -188,13 +174,11 @@ void md5_final(md5_context *ctx, __global unsigned char *output) {
                    (unsigned int)(ctx->input[i * 4 + 2]) << 16 |
                    (unsigned int)(ctx->input[i * 4 + 3]) << 24;
     }
-    // Append length of original message to complete last 512-bit chunk
     chunk[14] = (unsigned int)(ctx->size * 8);
     chunk[15] = (unsigned int)((ctx->size * 8) >> 32);
 
     md5_process(ctx, chunk);
 
-    // Copy to output buffer
     output[0]  = (unsigned char)((ctx->A & 0x000000FF));
     output[1]  = (unsigned char)((ctx->A & 0x0000FF00) >> 8);
     output[2]  = (unsigned char)((ctx->A & 0x00FF0000) >> 16);
@@ -215,7 +199,8 @@ void md5_final(md5_context *ctx, __global unsigned char *output) {
     return;
 }
 
-void compute_md5(const unsigned char *input, const unsigned int input_len, __global unsigned char *output) {
+void compute_md5(const unsigned char *input, const unsigned int input_len,
+                 __global unsigned char *output) {
     md5_context ctx;
     md5_init(&ctx);
     md5_update(&ctx, input, input_len);

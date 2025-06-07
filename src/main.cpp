@@ -3,6 +3,8 @@
 #include "globals.hpp"
 #include "helpers.hpp"
 #include "mask_attack.hpp"
+#include "opencl_setup.hpp"
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -123,11 +125,14 @@ int main(int argc, char *argv[]) {
     if (hash_file.is_open()) {
         std::string curr_line;
         while (std::getline(hash_file, curr_line)) {
+            curr_line.push_back('\0');
             input_hashes.insert(curr_line);
         }
     } else {
         input_hashes.insert(hash_or_hashfile);
     }
+
+    opencl_setup();
 
     if (atk_mode == 0) { // Dictionary attack
         dict = argv[argc - 1];
@@ -143,59 +148,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
-/* Buffer testing lmao */
-// #include <vector>
-// #include <iostream>
-// #include <optional>
-// #include <thread>
-// #include <atomic>
-
-// int main() {
-//     const int n = 12000;
-//     std::atomic_int num = 0;
-//     EntryBuffer<int> test(n);
-//     std::vector<std::thread> producers(n);
-//     std::vector<std::thread> consumers(n * 2);
-//     std::vector<int> res(n);
-//
-//     for (int i = 0; i < n; i++) {
-//         producers[i] = std::thread([&test, &num] {
-//             for (int j = 0; j < n; j++) {
-//                 test.add_item(j);
-//                 num++;
-//                 if (num == n * n)
-//                     test.add_done();
-//             }
-//         });
-//     }
-//
-//     for (int i = 0; i < n * 2; i++) {
-//         consumers[i] = std::thread([&test, &res] {
-//             for (int j = 0; j < n * 3 / 2; j++) {
-//                 std::optional<int> item = test.remove_item(res);
-//                 if (item == std::nullopt) {
-//                     break;
-//                 }
-//             }
-//         });
-//     }
-//
-//     for (int i = 0; i < n; i++) {
-//         producers[i].join();
-//         consumers[i].join();
-//     }
-//     for (int j = n; j < n * 2; j++) {
-//         consumers[j].join();
-//     }
-//
-//     for (int i = 0; i < n; i++) {
-//         if (res[i] != n) {
-//             std::cout << "you messed up\n";
-//             return 1;
-//         }
-//     }
-//     std::cout << "nice\n";
-//
-//     return 0;
-// }

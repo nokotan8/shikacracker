@@ -51,14 +51,6 @@ Help:
       --help-mask	Show information about how to format masks and exit.
 ```
 
-### Example: Dictionary attack
-
-```
-./shikacracker -m 0 -a 0 hashes.txt dict.txt
-```
-
-Hash each line in `dict.txt` using the MD5 algorithm and check if the hash exists in `hashes.txt`.
-
 ### Example: Mask attack
 
 ```
@@ -74,6 +66,11 @@ Generate all strings of length 6 where each character is a digit from 0-9, i.e.
 999998
 999999
 ```
+
+### Where is dictionary attack?
+
+Since I haven't implemented GPU acceleration for dictionary attacks, I moved it
+to the [cpu-only](https://github.com/nokotan8/shikacracker/tree/cpu-only) branch for now.
 
 Hash each of them and check if the hash exists in `hashes.txt`.
 

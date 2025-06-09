@@ -1,5 +1,4 @@
 #include "charsets.hpp"
-#include "dict_attack.hpp"
 #include "globals.hpp"
 #include "help.hpp"
 #include "mask_attack.hpp"
@@ -133,10 +132,7 @@ int main(int argc, char *argv[]) {
 
     opencl_setup();
 
-    if (atk_mode == 0) { // Dictionary attack
-        dict = argv[argc - 1];
-        dict_attack(input_hashes);
-    } else if (atk_mode == 3) { // Mask attack
+    if (atk_mode == 3) { // Mask attack
         const std::string mask = argv[argc - 1];
         try {
             mask_attack(mask, input_hashes, "generate_from_mask_md5");

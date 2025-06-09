@@ -30,15 +30,16 @@ void print_help_general(char *arg0) {
 void print_help_hash() {
     fprintf(stdout, "Hash types:\n"
                     "  0\tMD5\n"
-                    "  1\tSHA1\n"
-                    "  2\tSHA256\n"
-                    "  3\tSHA512\n");
+                    // "  1\tSHA1\n"
+                    // "  2\tSHA256\n"
+                    // "  3\tSHA512\n"
+            );
 }
 
 void print_help_mode() {
     fprintf(stdout,
             "Attack modes:\n"
-            "  0\tDictionary\tHash a list of words specified from a file\n"
+            // "  0\tDictionary\tHash a list of words specified from a file\n"
             "  3\tMask\t\tGenerate candidates from a format string\n");
 }
 

@@ -13,7 +13,7 @@ endif()
 
 add_executable(${PROJECT_NAME} 
     src/main.cpp
-    src/helpers.cpp
+    src/help.cpp
     src/hash.cpp
     src/dict_attack.cpp
     src/mask_attack.cpp

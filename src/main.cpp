@@ -1,7 +1,7 @@
 #include "charsets.hpp"
 #include "dict_attack.hpp"
 #include "globals.hpp"
-#include "helpers.hpp"
+#include "help.hpp"
 #include "mask_attack.hpp"
 #include "opencl_setup.hpp"
 

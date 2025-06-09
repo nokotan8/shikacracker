@@ -13,10 +13,6 @@ typedef struct {
     unsigned int D;
 } md5_context;
 
-unsigned int rotate_left32(const unsigned int x, const size_t n) {
-    return (x << n) | (x >> (32 - n));
-}
-
 #define MD5_A 0x67452301
 #define MD5_B 0xefcdab89
 #define MD5_C 0x98badcfe
@@ -146,7 +142,7 @@ void md5_update(md5_context *ctx, const unsigned char *input,
     }
 }
 
-void md5_final(md5_context *ctx, __global unsigned char *output) {
+void md5_final(md5_context *ctx, __private unsigned char *output) {
     unsigned int chunk[16];
     unsigned int offset = ctx->size % 64;
     ctx->input[offset++] = (unsigned char)0x80;
@@ -200,7 +196,7 @@ void md5_final(md5_context *ctx, __global unsigned char *output) {
 }
 
 void compute_md5(const unsigned char *input, const unsigned int input_len,
-                 __global unsigned char *output) {
+                 __private unsigned char *output) {
     md5_context ctx;
     md5_init(&ctx);
     md5_update(&ctx, input, input_len);

@@ -13,7 +13,6 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
-#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
@@ -160,6 +159,29 @@ void generate_candidates(entry_buffer<std::string> &candidate_buffer,
 }
 
 /**
+ * From the given charset_basis, reconstruct the last
+ * [length] characters of the candidate string with the
+ * given offset.
+ */
+std::string get_candidate(const char *charset_basis,
+                          const unsigned int *charset_offsets,
+                          const unsigned int *charset_lengths,
+                          const unsigned int offset,
+                          const unsigned int length) {
+
+    std::string res(length, '\0');
+    unsigned int idx = offset;
+    for (int pos = (int)length - 1; pos >= 0; pos--) {
+        size_t len = charset_lengths[pos];
+        size_t char_idx = idx % len;
+        idx /= len;
+        res[pos] = charset_basis[charset_offsets[pos] + char_idx];
+    }
+
+    return res;
+}
+
+/**
  * Performs a mask attack, similar to:
  * https://hashcat.net/wiki/doku.php?id=mask_attack
  */
@@ -258,7 +280,7 @@ void mask_attack(const std::string &mask,
         kernel.setArg(6, output_d);
         kernel.setArg(7, block_size);
 
-        while (1) {
+        while (input_hashes.empty() == false) {
             std::optional<std::string> input_str =
                 candidate_buffer.remove_item();
             if (input_str == std::nullopt)
@@ -291,12 +313,13 @@ void mask_attack(const std::string &mask,
 
                     if (input_hashes.count(digest_hex)) {
                         input_hashes.erase(digest_hex);
-                        fprintf(stdout,
-                                "Reverse of hash %s found: WAIT I GOTTA IMPL "
-                                "THIS\n",
-                                digest_hex.c_str());
-                        // size_t gid = block_offset + i;
-                        // std::cout << gid << '\n';
+                        std::string orig_string =
+                            input_str.value() +
+                            get_candidate(charset_basis, charset_offsets,
+                                          charset_lengths, block_offset + i,
+                                          pwd_length - on_host_length);
+                        fprintf(stdout, "Reverse of hash %s found: %s\n",
+                                digest_hex.c_str(), orig_string.c_str());
                     }
                 }
             }
@@ -304,6 +327,8 @@ void mask_attack(const std::string &mask,
     } catch (cl::Error &err) {
         fprintf(stderr, "error: %s\n", err.what());
     }
+
+    candidate_buffer.finished_add();
 
     gen_candidates_thread.join();
 

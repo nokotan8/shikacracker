@@ -1,6 +1,5 @@
 #include "dict_attack.hpp"
 #include "globals.hpp"
-#include "helpers.hpp"
 #include "hash.hpp"
 #include <cstdio>
 #include <cstdlib>

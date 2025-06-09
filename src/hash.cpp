@@ -82,8 +82,10 @@ void hash_thread(entry_buffer<std::string> &buffer,
             fprintf(stdout, "Reverse of hash %s found: %s\n",
                     hashed_str.c_str(), input_str->c_str());
         }
-        if (input_hashes.empty())
+        if (input_hashes.empty()) {
+            buffer.finished_add();
             break;
+        }
     }
 
     return;

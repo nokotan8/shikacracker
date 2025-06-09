@@ -4,7 +4,6 @@
 #include "entry_buffer.hpp"
 #include "globals.hpp"
 #include "hash.hpp"
-#include <algorithm>
 #include <functional>
 #include <openssl/evp.h>
 #include <stdexcept>
@@ -97,44 +96,22 @@ void generate_pwd_candidates_thread(std::string curr_str,
     }
 }
 
-void generate_pwd_candidates(std::string curr_str,
-                             const std::vector<std::string> &mask_format,
-                             entry_buffer<std::string> &buffer,
+void generate_pwd_candidates(std::string &curr_str,
+                             std::vector<std::string> &mask_format,
+                             entry_buffer<std::string> &buffer, int i,
                              concurrent_set<std::string> &input_hashes) {
-    const size_t n = mask_format.size();
-    size_t i = 0;
-    for (; i < n && mask_format[i].size() < 2; i++) {
-        curr_str[i] = mask_format[i][0];
-    }
-
+    const int n = mask_format.size();
     if (i == n) {
         if (input_hashes.empty())
             buffer.finished_add();
-        else
-            buffer.add_item(curr_str);
+        buffer.add_item(curr_str);
         return;
     }
 
-    size_t generate_num_threads =
-        std::min((size_t)num_threads, mask_format[i].size());
-    size_t thread_charspace = mask_format[i].size() / generate_num_threads;
-    std::vector<std::thread> generate_threads(generate_num_threads);
-
-    for (size_t j = 0; j < generate_num_threads; j++) {
-        size_t from_idx = j * thread_charspace;
-        size_t until_idx;
-        if (j == generate_num_threads - 1)
-            until_idx = mask_format[i].size() - 1;
-        else
-            until_idx = from_idx + thread_charspace - 1;
-
-        generate_threads[j] = std::thread(
-            generate_pwd_candidates_thread, curr_str, std::ref(mask_format),
-            std::ref(buffer), i, from_idx, until_idx, std::ref(input_hashes));
-    }
-
-    for (auto &thread : generate_threads) {
-        thread.join();
+    for (char c : mask_format[i]) {
+        curr_str[i] = c;
+        generate_pwd_candidates(curr_str, mask_format, buffer, i + 1,
+                                input_hashes);
     }
 
     return;
@@ -157,7 +134,7 @@ void mask_attack(concurrent_set<std::string> &input_hashes) {
     }
 
     std::string curr_str(mask_format.size(), '\0');
-    generate_pwd_candidates(curr_str, mask_format, buffer, input_hashes);
+    generate_pwd_candidates(curr_str, mask_format, buffer, 0, input_hashes);
     buffer.finished_add();
 
     for (auto &thread : cracker_threads) {

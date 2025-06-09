@@ -125,7 +125,6 @@ int main(int argc, char *argv[]) {
     if (hash_file.is_open()) {
         std::string curr_line;
         while (std::getline(hash_file, curr_line)) {
-            curr_line.push_back('\0');
             input_hashes.insert(curr_line);
         }
     } else {
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
     } else if (atk_mode == 3) { // Mask attack
         const std::string mask = argv[argc - 1];
         try {
-            mask_attack(mask, input_hashes);
+            mask_attack(mask, input_hashes, "generate_from_mask_md5");
         } catch (std::invalid_argument &err) {
             fprintf(stderr, "Error: %s\n", err.what());
         }

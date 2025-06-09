@@ -4,11 +4,14 @@ Shikacracker is a password cracker inspired by existing software such as
 [Hashcat](https://github.com/hashcat/hashcat) and [John the Ripper](https://github.com/openwall/john),
 written to teach myself and other users about password hashing, software optimization and other relevant concepts.
 
+The code on this branch does all the work on the CPU and uses OpenSSL's hash algorithms. No longer maintained as
+performance is greatly improved through GPU acceleration. This branch exists mainly for comparison purposes.
+The code on the main and opencl-support branches is much faster (and more interesting!).
+
 ## Dependencies
 
 - C++17 compiler (or newer)
 - [OpenSSL](https://github.com/openssl/openssl)
-- Probably more to come
 
 ## Build Instructions
 
@@ -79,7 +82,7 @@ Hash each of them and check if the hash exists in `hashes.txt`.
 
 ## Performance & Benchmarks
 
-See [benckmarks.md](/performance.md). Currently incomplete.
+See [benckmarks.md](/performance.md) for some basic benchmarks.
 
 ## Legal Disclaimer
 
@@ -99,5 +102,5 @@ does not provide any warranty or liability protection for misuse of this softwar
 
 ## Disclaimer 2
 
-This program uses a command-line option syntax similar to that of Hashcat, as I find it clean and user friendly.
-However, this implementation is entirely original and does not incorporate or derive from Hashcat’s source code in any way.
+While similar in functionality and command-line option syntax, this software does not incorporate or
+derive from Hashcat’s source code in any way.

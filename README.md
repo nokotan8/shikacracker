@@ -1,14 +1,14 @@
 # Shikacracker
 
-Shikacracker is a password cracker inspired by existing software such as
+Shikacracker is a password recovery tool inspired by existing software such as
 [Hashcat](https://github.com/hashcat/hashcat) and [John the Ripper](https://github.com/openwall/john),
-written to teach myself and other users about password hashing, software optimization and other relevant concepts.
+written to teach myself (and others) about password hashing, parallel programming and other relevant concepts.
 
 ## Dependencies
 
 - C++17 compiler (or newer)
-- [OpenSSL](https://github.com/openssl/openssl)
-- Probably more to come
+- OpenCL 2.x or 3.x compatible device
+- [OpenCL](https://www.khronos.org/opencl/)
 
 ## Build Instructions
 
@@ -77,6 +77,12 @@ Generate all strings of length 6 where each character is a digit from 0-9, i.e.
 
 Hash each of them and check if the hash exists in `hashes.txt`.
 
+## Supported Hashes
+
+- MD5
+
+That's it. Sorry, my bad. I'm working on SHA1 and SHA256 I promise.
+
 ## Performance & Benchmarks
 
 See [benckmarks.md](/performance.md). Currently incomplete.
@@ -99,5 +105,5 @@ does not provide any warranty or liability protection for misuse of this softwar
 
 ## Disclaimer 2
 
-This program uses a command-line option syntax similar to that of Hashcat, as I find it clean and user friendly.
-However, this implementation is entirely original and does not incorporate or derive from Hashcat’s source code in any way.
+While similar in functionality and command-line option syntax, this software does not incorporate or
+derive from Hashcat’s source code in any way.

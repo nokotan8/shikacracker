@@ -1,4 +1,6 @@
-#pragma once
+#ifndef INC_CONCURRENT_SET_H
+#define INC_CONCURRENT_SET_H
+
 #include <shared_mutex>
 #include <unordered_set>
 
@@ -51,3 +53,5 @@ template <typename T> class concurrent_set {
         return;
     }
 };
+
+#endif // INC_CONCURRENT_SET_H

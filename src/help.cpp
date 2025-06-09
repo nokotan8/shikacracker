@@ -1,19 +1,7 @@
-#include "helpers.hpp"
+#include "help.hpp"
 #include "globals.hpp"
 #include <cstdio>
-#include <cstdlib>
 #include <openssl/evp.h>
-#include <string>
-
-std::string trim_wspace(const std::string &str, const std::string &whitespace) {
-    const auto str_begin = str.find_first_not_of(whitespace);
-    if (str_begin == std::string::npos)
-        return "";
-
-    const size_t str_end = str.find_last_not_of(whitespace);
-
-    return str.substr(str_begin, str_end - str_begin + 1);
-}
 
 void print_help_general(char *arg0) {
     fprintf(
@@ -24,8 +12,6 @@ void print_help_general(char *arg0) {
         "  -a, --attack-mode\tAttack mode, e.g. dictionary, mask, etc.\n"
         "  -t, --threads\t\tNumber of threads to use for computing hashes "
         "(default 2).\n"
-        // "\t\t\tFor attack modes involving a mask, this also defines the\n"
-        // "\t\t\tnumber of threads used for password candidate generation.\n"
         "  -c, --char-order\tFile that defines the character order in "
         "which password\n"
         "\t\t\tcandidates for mask attacks should be generated. It should\n"

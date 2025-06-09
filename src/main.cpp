@@ -1,8 +1,10 @@
 #include "charsets.hpp"
 #include "dict_attack.hpp"
 #include "globals.hpp"
-#include "helpers.hpp"
+#include "help.hpp"
 #include "mask_attack.hpp"
+#include "opencl_setup.hpp"
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -20,7 +22,6 @@ int quiet_flag = 0;
 int num_threads = 2;
 int hash_mode = -1;
 int atk_mode = -1;
-std::string mask;
 std::string dict;
 
 int main(int argc, char *argv[]) {
@@ -130,13 +131,15 @@ int main(int argc, char *argv[]) {
         input_hashes.insert(hash_or_hashfile);
     }
 
+    opencl_setup();
+
     if (atk_mode == 0) { // Dictionary attack
         dict = argv[argc - 1];
         dict_attack(input_hashes);
     } else if (atk_mode == 3) { // Mask attack
-        mask = argv[argc - 1];
+        const std::string mask = argv[argc - 1];
         try {
-            mask_attack(input_hashes);
+            mask_attack(mask, input_hashes, "generate_from_mask_md5");
         } catch (std::invalid_argument &err) {
             fprintf(stderr, "Error: %s\n", err.what());
         }
@@ -144,59 +147,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
-/* Buffer testing lmao */
-// #include <vector>
-// #include <iostream>
-// #include <optional>
-// #include <thread>
-// #include <atomic>
-
-// int main() {
-//     const int n = 12000;
-//     std::atomic_int num = 0;
-//     EntryBuffer<int> test(n);
-//     std::vector<std::thread> producers(n);
-//     std::vector<std::thread> consumers(n * 2);
-//     std::vector<int> res(n);
-//
-//     for (int i = 0; i < n; i++) {
-//         producers[i] = std::thread([&test, &num] {
-//             for (int j = 0; j < n; j++) {
-//                 test.add_item(j);
-//                 num++;
-//                 if (num == n * n)
-//                     test.add_done();
-//             }
-//         });
-//     }
-//
-//     for (int i = 0; i < n * 2; i++) {
-//         consumers[i] = std::thread([&test, &res] {
-//             for (int j = 0; j < n * 3 / 2; j++) {
-//                 std::optional<int> item = test.remove_item(res);
-//                 if (item == std::nullopt) {
-//                     break;
-//                 }
-//             }
-//         });
-//     }
-//
-//     for (int i = 0; i < n; i++) {
-//         producers[i].join();
-//         consumers[i].join();
-//     }
-//     for (int j = n; j < n * 2; j++) {
-//         consumers[j].join();
-//     }
-//
-//     for (int i = 0; i < n; i++) {
-//         if (res[i] != n) {
-//             std::cout << "you messed up\n";
-//             return 1;
-//         }
-//     }
-//     std::cout << "nice\n";
-//
-//     return 0;
-// }

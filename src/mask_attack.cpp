@@ -3,173 +3,339 @@
 #include "concurrent_set.hpp"
 #include "entry_buffer.hpp"
 #include "globals.hpp"
-#include "hash.hpp"
+#include "opencl_setup.hpp"
+
+#include <CL/opencl.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <functional>
-#include <openssl/evp.h>
+#include <new>
 #include <stdexcept>
+#include <string.h>
 #include <string>
 #include <thread>
-#include <vector>
 
-/**
- * Converts user-inputted mask string into a vector
- * of strings, where each string represents the possible
- * character(s) at each position.
- */
-const std::vector<std::string> parse_mask() {
-    std::vector<std::string> res;
+size_t parse_mask(const std::string &mask, char **charset,
+                  unsigned int **charset_offsets,
+                  unsigned int **charset_lengths, unsigned int *pwd_length) {
+    if (mask.empty()) {
+        throw std::invalid_argument("mask must be at least 1 character long");
+    } else if (pwd_length == NULL) {
+        throw std::invalid_argument("pwd_length cannot be NULL");
+    }
+
+    if (*charset != nullptr || *charset_offsets != nullptr ||
+        *charset_lengths != nullptr) {
+        throw std::invalid_argument(
+            "charset, charset_offsets and charset_lengths must be NULL");
+    }
+
+    // First get length of password and mask
+    *pwd_length = 0;
+    size_t charset_len = 0;
     for (size_t i = 0; i < mask.size(); i++) {
-        if (mask[i] == '\\') {
+        if (mask[i] == '?') {
             if (i < mask.size() - 1) {
                 if (mask[i + 1] == '?') {
-                    res.push_back("?");
-                    i++;
-                } else if (mask[i + 1] == '\\') {
-                    res.push_back("\\");
+                    (*pwd_length)++;
+                    charset_len++;
                     i++;
                 } else {
-                    throw std::invalid_argument(
-                        "'" + mask.substr(i, 2) +
-                        "' is not a valid escape sequence");
-                }
-            } else {
-                throw std::invalid_argument(
-                    "'\\' at end of mask does not escape anything");
-            }
-        } else if (mask[i] == '?') {
-            if (i < mask.size() - 1) {
-                const std::string &charset = get_charset(mask[i + 1]);
-                if (charset.size() > 0) {
-                    res.push_back(charset);
-                    i++;
-                } else {
-                    throw std::invalid_argument(
-                        "'" + mask.substr(i, 2) +
-                        "' does not reference a valid charset");
+                    const std::string &curr_charset = get_charset(mask[i + 1]);
+                    if (curr_charset.empty() == false) {
+                        (*pwd_length)++;
+                        charset_len += curr_charset.size();
+                        i++;
+                    } else {
+                        throw std::invalid_argument(
+                            "'" + mask.substr(i, 2) +
+                            "' does not reference a valid charset");
+                    }
                 }
             } else {
                 throw std::invalid_argument(
                     "'?' at end of mask does not reference any charset");
             }
         } else {
-            res.push_back(std::string(1, mask[i]));
+            (*pwd_length)++;
+            charset_len++;
         }
     }
 
+    // Every element *should* be assigned a value, so malloc over calloc
+    *charset = (char *)malloc(sizeof(char) * charset_len);
+    if (*charset == nullptr) {
+        throw std::bad_alloc();
+    }
+    *charset_offsets =
+        (unsigned int *)malloc(sizeof(unsigned int) * (*pwd_length));
+    if (*charset_offsets == nullptr) {
+        free(*charset);
+        *charset = nullptr;
+        throw std::bad_alloc();
+    }
+    *charset_lengths =
+        (unsigned int *)malloc(sizeof(unsigned int) * (*pwd_length));
+    if (*charset_lengths == nullptr) {
+        free(*charset);
+        *charset = nullptr;
+        free(*charset_offsets);
+        *charset_offsets = nullptr;
+        throw std::bad_alloc();
+    }
+
+    // Then populate the arrays. Error checking already done.
+    size_t cset_idx = 0;
+    size_t cset_len_offset_idx = 0;
+    size_t cset_offset = 0;
+    for (size_t i = 0; i < mask.size(); i++, cset_len_offset_idx++) {
+        if (mask[i] == '?') {
+            if (mask[i + 1] == '?') {
+                (*charset)[cset_idx] = '?';
+                (*charset_lengths)[cset_len_offset_idx] = 1;
+                (*charset_offsets)[cset_len_offset_idx] = cset_offset;
+                cset_offset++;
+                cset_idx++;
+                i++;
+            } else {
+                const std::string &curr_charset = get_charset(mask[i + 1]);
+                memcpy((*charset + cset_idx), curr_charset.data(),
+                       curr_charset.size());
+                cset_idx += curr_charset.size();
+
+                (*charset_lengths)[cset_len_offset_idx] = curr_charset.size();
+                (*charset_offsets)[cset_len_offset_idx] = cset_offset;
+                cset_offset += curr_charset.size();
+                i++;
+            }
+        } else {
+            (*charset)[cset_idx] = mask[i];
+            (*charset_lengths)[cset_len_offset_idx] = 1;
+            (*charset_offsets)[cset_len_offset_idx] = cset_offset;
+            cset_offset++;
+            cset_idx++;
+        }
+    }
+
+    return charset_len;
+}
+
+/**
+ * Generate the first on_host_len characters of candidates.
+ */
+void generate_candidates(entry_buffer<std::string> &candidate_buffer,
+                         const char *charset_basis,
+                         const unsigned int *charset_offsets,
+                         const unsigned int *charset_lengths,
+                         const unsigned int on_host_length) {
+    if (on_host_length > 0) {
+        unsigned int on_host_space_size = 1;
+        for (unsigned int i = 0; i < on_host_length; i++) {
+            on_host_space_size *= charset_lengths[i];
+        }
+
+        std::string res(on_host_length, '\0');
+        for (unsigned int i = 0; i < on_host_space_size; i++) {
+            unsigned int idx = i;
+            for (int pos = (int)on_host_length - 1; pos >= 0; pos--) {
+                size_t len = charset_lengths[pos];
+                size_t char_idx = idx % len;
+                idx /= len;
+                res[pos] = charset_basis[charset_offsets[pos] + char_idx];
+            }
+
+            // std::cout << res << '\n';
+            candidate_buffer.add_item(res);
+        }
+    } else {
+        candidate_buffer.add_item("");
+    }
+
+    candidate_buffer.finished_add();
+}
+
+/**
+ * From the given charset_basis, reconstruct the last
+ * [length] characters of the candidate string with the
+ * given offset.
+ */
+std::string get_candidate(const char *charset_basis,
+                          const unsigned int *charset_offsets,
+                          const unsigned int *charset_lengths,
+                          const unsigned int offset,
+                          const unsigned int length) {
+
+    std::string res(length, '\0');
+    unsigned int idx = offset;
+    for (int pos = (int)length - 1; pos >= 0; pos--) {
+        size_t len = charset_lengths[pos];
+        size_t char_idx = idx % len;
+        idx /= len;
+        res[pos] = charset_basis[charset_offsets[pos] + char_idx];
+    }
+
     return res;
-}
-
-void generate_pwd_candidates_cont(std::string &curr_str,
-                                  const std::vector<std::string> &mask_format,
-                                  entry_buffer<std::string> &buffer, size_t i,
-                                  concurrent_set<std::string> &input_hashes) {
-    const size_t n = mask_format.size();
-    if (i == n) {
-        if (input_hashes.empty())
-            buffer.finished_add();
-        else
-            buffer.add_item(curr_str);
-        return;
-    }
-
-    for (char c : mask_format[i]) {
-        curr_str[i] = c;
-        generate_pwd_candidates_cont(curr_str, mask_format, buffer, i + 1,
-                                     input_hashes);
-    }
-
-    return;
-}
-
-void generate_pwd_candidates_thread(std::string curr_str,
-                                    const std::vector<std::string> &mask_format,
-                                    entry_buffer<std::string> &buffer, size_t i,
-                                    size_t from_idx, size_t until_idx,
-                                    concurrent_set<std::string> &input_hashes) {
-    if (i >= mask_format.size())
-        return;
-
-    for (size_t j = from_idx; j <= until_idx; j++) {
-        curr_str[i] = mask_format[i][j];
-        generate_pwd_candidates_cont(curr_str, mask_format, buffer, i + 1,
-                                     input_hashes);
-    }
-}
-
-void generate_pwd_candidates(std::string curr_str,
-                             const std::vector<std::string> &mask_format,
-                             entry_buffer<std::string> &buffer,
-                             concurrent_set<std::string> &input_hashes) {
-    const size_t n = mask_format.size();
-    size_t i = 0;
-    for (; i < n && mask_format[i].size() < 2; i++) {
-        curr_str[i] = mask_format[i][0];
-    }
-
-    if (i == n) {
-        if (input_hashes.empty())
-            buffer.finished_add();
-        else
-            buffer.add_item(curr_str);
-        return;
-    }
-
-    size_t generate_num_threads =
-        std::min((size_t)num_threads, mask_format[i].size());
-    size_t thread_charspace = mask_format[i].size() / generate_num_threads;
-    std::vector<std::thread> generate_threads(generate_num_threads);
-
-    for (size_t j = 0; j < generate_num_threads; j++) {
-        size_t from_idx = j * thread_charspace;
-        size_t until_idx;
-        if (j == generate_num_threads - 1)
-            until_idx = mask_format[i].size() - 1;
-        else
-            until_idx = from_idx + thread_charspace - 1;
-
-        generate_threads[j] = std::thread(
-            generate_pwd_candidates_thread, curr_str, std::ref(mask_format),
-            std::ref(buffer), i, from_idx, until_idx, std::ref(input_hashes));
-    }
-
-    for (auto &thread : generate_threads) {
-        thread.join();
-    }
-
-    return;
 }
 
 /**
  * Performs a mask attack, similar to:
  * https://hashcat.net/wiki/doku.php?id=mask_attack
  */
-void mask_attack(concurrent_set<std::string> &input_hashes) {
-    std::vector<std::string> mask_format = parse_mask();
+void mask_attack(const std::string &mask,
+                 concurrent_set<std::string> &input_hashes,
+                 std::string kernel_fn_name) {
+    char *charset_basis = nullptr;
+    cl_uint *charset_offsets = nullptr;
+    cl_uint *charset_lengths = nullptr;
+    cl_uint pwd_length;
 
-    std::vector<std::thread> cracker_threads(num_threads);
-    entry_buffer<std::string> buffer(num_threads * 4);
-    const EVP_MD *hash_type = hash_mode_to_EVP_MD();
+    size_t charset_len;
+    try {
+        charset_len = parse_mask(mask, &charset_basis, &charset_offsets,
+                                 &charset_lengths, &pwd_length);
 
-    for (int i = 0; i < num_threads; i++) {
-        cracker_threads[i] = std::thread(hash_thread, std::ref(buffer),
-                                         std::ref(input_hashes), hash_type);
+    } catch (std::invalid_argument &err) {
+        return;
+    } catch (std::bad_alloc &err) {
+        fprintf(stderr, "No memory in mask_attack");
+        return;
     }
 
-    std::string curr_str(mask_format.size(), '\0');
-    generate_pwd_candidates(curr_str, mask_format, buffer, input_hashes);
-    buffer.finished_add();
+    cl_uint on_host_length = pwd_length / 2;
 
-    for (auto &thread : cracker_threads) {
-        thread.join();
+    // # of candidates that will be generated from each
+    // half-computed mask
+    size_t charset_space_size = 1;
+    for (cl_uint i = on_host_length; i < pwd_length; i++) {
+        charset_space_size *= charset_lengths[i];
     }
 
-    if (input_hashes.size() != 0) {
-        fprintf(stdout, "Hashes not cracked:\n");
-        for (const auto &hash : input_hashes.set) {
-            fprintf(stdout, "%s\n", hash.c_str());
+    // Stores half-generated candidates
+    entry_buffer<std::string> candidate_buffer(10);
+    std::thread gen_candidates_thread(
+        generate_candidates, std::ref(candidate_buffer), charset_basis,
+        charset_offsets, charset_lengths, on_host_length);
+
+    cl_uint block_size = std::min(charset_space_size, (size_t)4096 * 64);
+    size_t digest_size = 16;
+
+    cl::Context context(cl::Device::getDefault());
+    cl::CommandQueue queue(context, cl::Device::getDefault());
+
+    std::string kernel_code =
+        get_file_contents("../src/opencl/bitops.cl") + "\n" +
+        get_file_contents("../src/opencl/md5.cl") + "\n" +
+        get_file_contents("../src/opencl/mask_generate.cl");
+
+    cl::Program program(context, kernel_code);
+    try {
+        program.build(cl::Device::getDefault());
+    } catch (cl::BuildError &err) {
+        fprintf(
+            stderr, "Error building: %s\n",
+            program
+                .getBuildInfo<CL_PROGRAM_BUILD_LOG>({cl::Device::getDefault()})
+                .c_str());
+
+        free(charset_basis);
+        free(charset_offsets);
+        free(charset_lengths);
+
+        return;
+    }
+
+    cl::Buffer charset_basis_d(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                               sizeof(cl_char) * charset_len, charset_basis);
+    cl::Buffer charset_offsets_d(context,
+                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_uint) * pwd_length, charset_offsets);
+    cl::Buffer charset_lengths_d(context,
+                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_uint) * pwd_length, charset_lengths);
+    cl::Buffer pwd_first_half_d(context, CL_MEM_READ_WRITE,
+                                sizeof(cl_char) * on_host_length);
+    cl::Buffer output_d(context, CL_MEM_WRITE_ONLY,
+                        sizeof(cl_char) * digest_size * block_size * 2);
+
+    cl_char *output =
+        (cl_char *)malloc(sizeof(cl_char) * digest_size * block_size * 2);
+    if (output == nullptr) {
+        free(charset_basis);
+        free(charset_offsets);
+        free(charset_lengths);
+        throw std::bad_alloc();
+    }
+
+    try {
+        cl::Kernel kernel(program, kernel_fn_name);
+        kernel.setArg(0, charset_basis_d);
+        kernel.setArg(1, charset_offsets_d);
+        kernel.setArg(2, charset_lengths_d);
+        kernel.setArg(4, on_host_length);
+        kernel.setArg(5, pwd_length);
+        kernel.setArg(6, output_d);
+        kernel.setArg(7, block_size);
+
+        while (input_hashes.empty() == false) {
+            std::optional<std::string> input_str =
+                candidate_buffer.remove_item();
+            if (input_str == std::nullopt)
+                break;
+
+            size_t block_offset = 0;
+            size_t num_blocks =
+                (charset_space_size + block_size - 1) / block_size;
+            for (size_t i = 0; i < num_blocks;
+                 i++, block_offset += block_size) {
+                size_t block_end =
+                    std::min(block_size + block_offset, charset_space_size);
+                size_t num_hashes = block_end - block_offset;
+
+                queue.enqueueWriteBuffer(pwd_first_half_d, CL_TRUE, 0,
+                                         sizeof(cl_char) * on_host_length,
+                                         input_str.value().data());
+                kernel.setArg(3, pwd_first_half_d);
+
+                queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
+                                           cl::NDRange(block_end));
+                queue.enqueueReadBuffer(
+                    output_d, CL_TRUE, 0,
+                    sizeof(cl_char) * digest_size * num_hashes * 2, output);
+
+                std::string digest_hex(digest_size * 2, '\0');
+                for (size_t i = 0; i < num_hashes; i++) {
+                    size_t offset = i * digest_size * 2;
+                    memcpy(digest_hex.data(), output + offset, digest_size * 2);
+
+                    if (input_hashes.count(digest_hex)) {
+                        input_hashes.erase(digest_hex);
+                        std::string orig_string =
+                            input_str.value() +
+                            get_candidate(charset_basis, charset_offsets,
+                                          charset_lengths, block_offset + i,
+                                          pwd_length - on_host_length);
+                        fprintf(stdout, "Reverse of hash %s found: %s\n",
+                                digest_hex.c_str(), orig_string.c_str());
+                    }
+                }
+            }
         }
+    } catch (cl::Error &err) {
+        fprintf(stderr, "error: %s\n", err.what());
     }
+
+    candidate_buffer.finished_add();
+
+    gen_candidates_thread.join();
+
+    free(output);
+    free(charset_basis);
+    free(charset_offsets);
+    free(charset_lengths);
 
     return;
 }

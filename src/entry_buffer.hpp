@@ -1,6 +1,7 @@
-#pragma once
+#ifndef INC_ENTRY_BUF_H
+#define INC_ENTRY_BUF_H
+
 #include <condition_variable>
-#include <iostream>
 #include <mutex>
 #include <optional>
 
@@ -10,7 +11,9 @@ template <typename T> class entry_buffer {
     ~entry_buffer() = default;
 
     // Maximum number of items that the buffer can hold
-    int max_size() { return buf_size; }
+    int max_size() {
+        return buf_size;
+    }
 
     // Add an item to the buffer
     // Returns true if the item was successfully added,
@@ -78,8 +81,14 @@ template <typename T> class entry_buffer {
     std::condition_variable cv;
 
     // Checks whether the buffer is full
-    bool full() { return (write_i + 1) % buf_size == read_i; }
+    bool full() {
+        return (write_i + 1) % buf_size == read_i;
+    }
 
     // Checks whether the buffer is empty
-    bool empty() { return write_i == read_i; }
+    bool empty() {
+        return write_i == read_i;
+    }
 };
+
+#endif // INC_ENTRY_BUF_H

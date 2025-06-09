@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <functional>
 #include <iostream>
@@ -91,22 +92,20 @@ size_t parse_mask(const std::string &mask, char **charset,
     size_t cset_idx = 0;
     size_t cset_len_offset_idx = 0;
     size_t cset_offset = 0;
-    for (size_t i = 0; i < mask.size();
-         i++, cset_idx++, cset_len_offset_idx++) {
+    for (size_t i = 0; i < mask.size(); i++, cset_len_offset_idx++) {
         if (mask[i] == '?') {
             if (mask[i + 1] == '?') {
                 (*charset)[cset_idx] = '?';
                 (*charset_lengths)[cset_len_offset_idx] = 1;
                 (*charset_offsets)[cset_len_offset_idx] = cset_offset;
                 cset_offset++;
+                cset_idx++;
                 i++;
             } else {
                 const std::string &curr_charset = get_charset(mask[i + 1]);
-                for (char c : curr_charset) {
-                    (*charset)[cset_idx] = c;
-                    cset_idx++;
-                }
-                cset_idx--;
+                memcpy((*charset + cset_idx), curr_charset.data(),
+                       curr_charset.size());
+                cset_idx += curr_charset.size();
 
                 (*charset_lengths)[cset_len_offset_idx] = curr_charset.size();
                 (*charset_offsets)[cset_len_offset_idx] = cset_offset;
@@ -118,6 +117,7 @@ size_t parse_mask(const std::string &mask, char **charset,
             (*charset_lengths)[cset_len_offset_idx] = 1;
             (*charset_offsets)[cset_len_offset_idx] = cset_offset;
             cset_offset++;
+            cset_idx++;
         }
     }
 

@@ -72,8 +72,6 @@ Generate all strings of length 6 where each character is a digit from 0-9, i.e.
 Since I haven't implemented GPU acceleration for dictionary attacks, I moved it
 to the [cpu-only](https://github.com/nokotan8/shikacracker/tree/cpu-only) branch for now.
 
-Hash each of them and check if the hash exists in `hashes.txt`.
-
 ## Supported Hashes
 
 - MD5

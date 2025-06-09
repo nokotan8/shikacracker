@@ -1,4 +1,4 @@
-# Shikacracker
+# Shikacracker (CPU only)
 
 Shikacracker is a password cracker inspired by existing software such as
 [Hashcat](https://github.com/hashcat/hashcat) and [John the Ripper](https://github.com/openwall/john),

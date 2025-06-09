@@ -16,6 +16,7 @@
 #include <iostream>
 #include <new>
 #include <stdexcept>
+#include <string.h>
 #include <string>
 #include <thread>
 
@@ -163,11 +164,12 @@ void generate_candidates(entry_buffer<std::string> &candidate_buffer,
  * https://hashcat.net/wiki/doku.php?id=mask_attack
  */
 void mask_attack(const std::string &mask,
-                 concurrent_set<std::string> &input_hashes) {
+                 concurrent_set<std::string> &input_hashes,
+                 std::string kernel_fn_name) {
     char *charset_basis = nullptr;
-    unsigned int *charset_offsets = nullptr;
-    unsigned int *charset_lengths = nullptr;
-    unsigned int pwd_length;
+    cl_uint *charset_offsets = nullptr;
+    cl_uint *charset_lengths = nullptr;
+    cl_uint pwd_length;
 
     size_t charset_len;
     try {
@@ -177,16 +179,16 @@ void mask_attack(const std::string &mask,
     } catch (std::invalid_argument &err) {
         return;
     } catch (std::bad_alloc &err) {
-        fprintf(stdout, "No memory in mask_attack");
+        fprintf(stderr, "No memory in mask_attack");
         return;
     }
 
-    unsigned int on_host_length = pwd_length / 2;
+    cl_uint on_host_length = pwd_length / 2;
 
     // # of candidates that will be generated from each
     // half-computed mask
     size_t charset_space_size = 1;
-    for (unsigned int i = on_host_length; i < pwd_length; i++) {
+    for (cl_uint i = on_host_length; i < pwd_length; i++) {
         charset_space_size *= charset_lengths[i];
     }
 
@@ -196,13 +198,14 @@ void mask_attack(const std::string &mask,
         generate_candidates, std::ref(candidate_buffer), charset_basis,
         charset_offsets, charset_lengths, on_host_length);
 
-    unsigned int block_size = std::min(charset_space_size, (size_t)4096 * 64);
+    cl_uint block_size = std::min(charset_space_size, (size_t)4096 * 64);
     size_t digest_size = 16;
 
     cl::Context context(cl::Device::getDefault());
     cl::CommandQueue queue(context, cl::Device::getDefault());
 
     std::string kernel_code =
+        get_file_contents("../src/opencl/bitops.cl") + "\n" +
         get_file_contents("../src/opencl/md5.cl") + "\n" +
         get_file_contents("../src/opencl/mask_generate.cl");
 
@@ -211,7 +214,7 @@ void mask_attack(const std::string &mask,
         program.build(cl::Device::getDefault());
     } catch (cl::BuildError &err) {
         fprintf(
-            stdout, "Error building: %s\n",
+            stderr, "Error building: %s\n",
             program
                 .getBuildInfo<CL_PROGRAM_BUILD_LOG>({cl::Device::getDefault()})
                 .c_str());
@@ -234,10 +237,10 @@ void mask_attack(const std::string &mask,
     cl::Buffer pwd_first_half_d(context, CL_MEM_READ_WRITE,
                                 sizeof(cl_char) * on_host_length);
     cl::Buffer output_d(context, CL_MEM_WRITE_ONLY,
-                        sizeof(cl_uchar) * digest_size * block_size);
+                        sizeof(cl_char) * digest_size * block_size * 2);
 
-    cl_uchar *output =
-        (cl_uchar *)malloc(sizeof(cl_uchar) * digest_size * block_size);
+    cl_char *output =
+        (cl_char *)malloc(sizeof(cl_char) * digest_size * block_size * 2);
     if (output == nullptr) {
         free(charset_basis);
         free(charset_offsets);
@@ -246,7 +249,7 @@ void mask_attack(const std::string &mask,
     }
 
     try {
-        cl::Kernel kernel(program, "generate_from_mask");
+        cl::Kernel kernel(program, kernel_fn_name);
         kernel.setArg(0, charset_basis_d);
         kernel.setArg(1, charset_offsets_d);
         kernel.setArg(2, charset_lengths_d);
@@ -274,19 +277,17 @@ void mask_attack(const std::string &mask,
                                          sizeof(cl_char) * on_host_length,
                                          input_str.value().data());
                 kernel.setArg(3, pwd_first_half_d);
+
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
                                            cl::NDRange(block_end));
                 queue.enqueueReadBuffer(
                     output_d, CL_TRUE, 0,
-                    sizeof(cl_uchar) * digest_size * num_hashes, output);
+                    sizeof(cl_char) * digest_size * num_hashes * 2, output);
 
-                std::string digest_hex(digest_size * 2 + 1, '\0');
+                std::string digest_hex(digest_size * 2, '\0');
                 for (size_t i = 0; i < num_hashes; i++) {
-                    size_t offset = i * digest_size;
-                    for (size_t j = 0; j < digest_size; j++) {
-                        snprintf(&digest_hex[j * 2], 3, "%02x",
-                                 output[j + offset]);
-                    }
+                    size_t offset = i * digest_size * 2;
+                    memcpy(digest_hex.data(), output + offset, digest_size * 2);
 
                     if (input_hashes.count(digest_hex)) {
                         input_hashes.erase(digest_hex);
@@ -294,14 +295,14 @@ void mask_attack(const std::string &mask,
                                 "Reverse of hash %s found: WAIT I GOTTA IMPL "
                                 "THIS\n",
                                 digest_hex.c_str());
-                        size_t gid = block_offset + i;
-                        std::cout << gid << '\n';
+                        // size_t gid = block_offset + i;
+                        // std::cout << gid << '\n';
                     }
                 }
             }
         }
     } catch (cl::Error &err) {
-        std::cout << "error: " << err.what() << '\n';
+        fprintf(stderr, "error: %s\n", err.what());
     }
 
     gen_candidates_thread.join();

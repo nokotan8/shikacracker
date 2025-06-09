@@ -5,6 +5,7 @@
 #include <string>
 
 void mask_attack(const std::string &mask,
-                 concurrent_set<std::string> &input_hashes);
+                 concurrent_set<std::string> &input_hashes,
+                 std::string kernel_fn_name);
 
 #endif // INC_MASK_ATTACK_H

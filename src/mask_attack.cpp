@@ -19,7 +19,7 @@
 #include <string>
 #include <thread>
 
-size_t parse_mask(const std::string &mask, char **charset,
+size_t parse_mask(const std::string &mask, unsigned char **charset,
                   unsigned int **charset_offsets,
                   unsigned int **charset_lengths, unsigned int *pwd_length) {
     if (mask.empty()) {
@@ -67,7 +67,7 @@ size_t parse_mask(const std::string &mask, char **charset,
     }
 
     // Every element *should* be assigned a value, so malloc over calloc
-    *charset = (char *)malloc(sizeof(char) * charset_len);
+    *charset = (unsigned char *)malloc(sizeof(unsigned char) * charset_len);
     if (*charset == nullptr) {
         throw std::bad_alloc();
     }
@@ -128,7 +128,7 @@ size_t parse_mask(const std::string &mask, char **charset,
  * Generate the first on_host_len characters of candidates.
  */
 void generate_candidates(entry_buffer<std::string> &candidate_buffer,
-                         const char *charset_basis,
+                         const unsigned char *charset_basis,
                          const unsigned int *charset_offsets,
                          const unsigned int *charset_lengths,
                          const unsigned int on_host_length) {
@@ -163,7 +163,7 @@ void generate_candidates(entry_buffer<std::string> &candidate_buffer,
  * [length] characters of the candidate string with the
  * given offset.
  */
-std::string get_candidate(const char *charset_basis,
+std::string get_candidate(const unsigned char *charset_basis,
                           const unsigned int *charset_offsets,
                           const unsigned int *charset_lengths,
                           const unsigned int offset,
@@ -188,7 +188,7 @@ std::string get_candidate(const char *charset_basis,
 void mask_attack(const std::string &mask,
                  concurrent_set<std::string> &input_hashes,
                  std::string kernel_fn_name) {
-    char *charset_basis = nullptr;
+    unsigned char *charset_basis = nullptr;
     cl_uint *charset_offsets = nullptr;
     cl_uint *charset_lengths = nullptr;
     cl_uint pwd_length;

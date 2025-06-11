@@ -13,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
+#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
@@ -231,7 +232,9 @@ void mask_attack(const std::string &mask,
         get_file_contents("../src/opencl/md5.cl") + "\n" +
         get_file_contents("../src/opencl/mask_generate.cl");
 
-    cl::Program program(context, kernel_code);
+    cl::Program program(context, kernel_code,
+                        CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+
     try {
         program.build(cl::Device::getDefault());
     } catch (cl::BuildError &err) {
@@ -280,6 +283,12 @@ void mask_attack(const std::string &mask,
         kernel.setArg(6, output_d);
         kernel.setArg(7, block_size);
 
+        cl::Event curr_event;
+        bool first_block = true;
+        size_t num_hashes_prev;
+        size_t block_offset_prev;
+        std::string input_str_prev;
+
         while (input_hashes.empty() == false) {
             std::optional<std::string> input_str =
                 candidate_buffer.remove_item();
@@ -300,28 +309,68 @@ void mask_attack(const std::string &mask,
                                          input_str.value().data());
                 kernel.setArg(3, pwd_first_half_d);
 
-                queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
-                                           cl::NDRange(block_end));
-                queue.enqueueReadBuffer(
-                    output_d, CL_TRUE, 0,
-                    sizeof(cl_char) * digest_size * num_hashes * 2, output);
+                if (first_block == false) {
+                    curr_event.wait();
 
-                std::string digest_hex(digest_size * 2, '\0');
-                for (size_t i = 0; i < num_hashes; i++) {
-                    size_t offset = i * digest_size * 2;
-                    memcpy(digest_hex.data(), output + offset, digest_size * 2);
-
-                    if (input_hashes.count(digest_hex)) {
-                        input_hashes.erase(digest_hex);
-                        std::string orig_string =
-                            input_str.value() +
-                            get_candidate(charset_basis, charset_offsets,
-                                          charset_lengths, block_offset + i,
-                                          pwd_length - on_host_length);
-                        fprintf(stdout, "Reverse of hash %s found: %s\n",
-                                digest_hex.c_str(), orig_string.c_str());
-                    }
+                    queue.enqueueReadBuffer(output_d, CL_TRUE, 0,
+                                            sizeof(cl_char) * digest_size *
+                                                num_hashes_prev * 2,
+                                            output);
                 }
+
+                queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
+                                           cl::NDRange(block_end),
+                                           cl::NullRange, nullptr, &curr_event);
+
+                if (first_block == false) {
+                    std::string digest_hex(digest_size * 2, '\0');
+                    for (size_t i = 0; i < num_hashes_prev; i++) {
+                        size_t offset = i * digest_size * 2;
+                        memcpy(digest_hex.data(), output + offset,
+                               digest_size * 2);
+
+                        if (input_hashes.count(digest_hex)) {
+                            input_hashes.erase(digest_hex);
+                            std::string orig_string =
+                                input_str_prev +
+                                get_candidate(charset_basis, charset_offsets,
+                                              charset_lengths,
+                                              block_offset_prev + i,
+                                              pwd_length - on_host_length);
+                            fprintf(stdout, "Reverse of hash %s found: %s\n",
+                                    digest_hex.c_str(), orig_string.c_str());
+                        }
+                    }
+                } else {
+                    first_block = false;
+                }
+
+                block_offset_prev = block_offset;
+                num_hashes_prev = num_hashes;
+                input_str_prev = input_str.value();
+            }
+        }
+
+        // Last block
+        curr_event.wait();
+        queue.enqueueReadBuffer(
+            output_d, CL_TRUE, 0,
+            sizeof(cl_char) * digest_size * num_hashes_prev * 2, output);
+
+        std::string digest_hex(digest_size * 2, '\0');
+        for (size_t i = 0; i < num_hashes_prev; i++) {
+            size_t offset = i * digest_size * 2;
+            memcpy(digest_hex.data(), output + offset, digest_size * 2);
+
+            if (input_hashes.count(digest_hex)) {
+                input_hashes.erase(digest_hex);
+                std::string orig_string =
+                    input_str_prev +
+                    get_candidate(charset_basis, charset_offsets,
+                                  charset_lengths, block_offset_prev + i,
+                                  pwd_length - on_host_length);
+                fprintf(stdout, "Reverse of hash %s found: %s\n",
+                        digest_hex.c_str(), orig_string.c_str());
             }
         }
     } catch (cl::Error &err) {

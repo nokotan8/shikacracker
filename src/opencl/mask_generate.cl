@@ -2,13 +2,13 @@
 #define MD5_DIGEST_LEN 16
 
 __kernel void generate_from_mask_md5(
-    __constant const unsigned char *charset_basis,           // flattened char **
-    __constant const unsigned int *charset_offsets, // length = pwd_length
-    __constant const unsigned int *charset_lengths, // length = pwd_length
-    __constant const unsigned char *pwd_first_half,          // part of the mask that is already generated
-    const unsigned int curr_length,                 // length of pwd_first_half
+    __constant const unsigned char *charset_basis,          // flattened char **
+    __constant const unsigned int *charset_offsets,         // length = pwd_length
+    __constant const unsigned int *charset_lengths,         // length = pwd_length
+    __constant const unsigned char *pwd_first_half,         // part of the mask that is already generated
+    const unsigned int curr_length,                         // length of pwd_first_half
     const unsigned int pwd_length,
-    __global char *output,
+    __global unsigned char *output,
     const unsigned int block_size) {
 
     size_t gid = get_global_id(0);
@@ -32,6 +32,6 @@ __kernel void generate_from_mask_md5(
     compute_md5(pwd_candidate, pwd_length, output_raw);
 
     size_t output_offset = (gid % block_size) * 32; // hash length = 16, double for hex
-    char_to_hex(output_raw, output + output_offset, MD5_DIGEST_LEN);
+    char_to_hex(output_raw, output + output_offset, (unsigned int)MD5_DIGEST_LEN);
 }
 

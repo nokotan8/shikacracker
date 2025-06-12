@@ -78,14 +78,14 @@ void compute_md5(const char *input, const size_t input_len, char *output) {
  * code with OpenSSL's implementation.
  */
 int main(void) {
-    size_t MAX_LEN = 1024;
+    size_t MAX_LEN = 2048;
     size_t EACH_NUM = 200;
     char input[MAX_LEN + 1];
 
     char my_output[32];
     std::string openssl_output;
-    for (size_t i = 1; i < EACH_NUM; i++) {
-        for (size_t j = 0; j < 200; j++) {
+    for (size_t i = 1; i < MAX_LEN; i++) {
+        for (size_t j = 0; j < EACH_NUM; j++) {
             for (size_t k = 0; k <= i; k++) {
                 input[k] = get_rand(127);
             }

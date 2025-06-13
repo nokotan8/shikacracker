@@ -13,7 +13,9 @@
 #include "hashes/murmurhash3/murmurhash3.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
+#include <new>
 #include <stdint.h>
 #include <vector>
 
@@ -23,12 +25,14 @@
 template <typename T> class hash_map {
   public:
     hash_map(size_t starting_buckets = 32) {
-        buckets = std::vector(starting_buckets, nullptr);
+        buckets = std::vector<node *>(starting_buckets, nullptr);
     }
 
     ~hash_map() {
         for (node *curr : buckets) {
             while (curr != nullptr) {
+                free(curr->key);
+
                 node *tmp = curr;
                 curr = curr->next;
                 delete tmp;
@@ -36,10 +40,10 @@ template <typename T> class hash_map {
         }
     }
 
-    void insert(char *key, T value) {
-        uint32_t idx = get_key_hash(key) % buckets.size();
+    void insert(const char *key, T value) {
+        uint32_t bucket_idx = get_key_hash(key) % buckets.size();
 
-        node *curr = buckets[idx];
+        node *curr = buckets[bucket_idx];
         while (curr != nullptr) {
             if (strcmp(key, curr->key) == 0) {
                 curr->value = value;
@@ -49,18 +53,18 @@ template <typename T> class hash_map {
         }
 
         node *new_node = new node(key, value);
-        new_node->next = buckets[idx];
-        buckets[idx] = new_node;
+        new_node->next = buckets[bucket_idx];
+        buckets[bucket_idx] = new_node;
 
-        size++;
-        double load_factor = (1.0 * size) / buckets.size();
+        num_entries++;
+        double load_factor = (1.0 * num_entries) / buckets.size();
 
         if (load_factor > MAX_LOAD_FACTOR) {
             rehash();
         }
     }
 
-    bool exists(char *key, uint32_t bucket_idx) {
+    bool exists(const char *key, uint32_t bucket_idx) const {
         bucket_idx %= buckets.size();
 
         node *curr = buckets[bucket_idx];
@@ -68,12 +72,13 @@ template <typename T> class hash_map {
             if (strcmp(key, curr->key) == 0) {
                 return true;
             }
+            curr = curr->next;
         }
 
         return false;
     }
 
-    bool exists(char *key) {
+    bool exists(const char *key) const {
         uint32_t idx = get_key_hash(key);
 
         return exists(key, idx);
@@ -83,7 +88,7 @@ template <typename T> class hash_map {
      * Get the value associated with a given key.
      * If it does not exist, return def (default)
      */
-    T get(char *key, uint32_t bucket_idx, T def) {
+    T get(const char *key, uint32_t bucket_idx, T default_) const {
         bucket_idx %= buckets.size();
 
         node *curr = buckets[bucket_idx];
@@ -91,18 +96,19 @@ template <typename T> class hash_map {
             if (strcmp(key, curr->key) == 0) {
                 return curr->value;
             }
+            curr = curr->next;
         }
 
-        return def;
+        return default_;
     }
 
-    T get(char *key, T def) {
+    T get(const char *key, T default_) const {
         uint32_t idx = get_key_hash(key);
 
-        return get(key, idx, def);
+        return get(key, idx, default_);
     }
 
-    bool erase(char *key, uint32_t bucket_idx) {
+    bool erase(const char *key, uint32_t bucket_idx) {
         bucket_idx %= buckets.size();
 
         node *curr = buckets[bucket_idx];
@@ -115,24 +121,36 @@ template <typename T> class hash_map {
                     prev->next = curr->next;
                 }
                 delete curr;
-                size--;
+                num_entries--;
+
                 return true;
             }
+
+            prev = curr;
+            curr = curr->next;
         }
 
         return false;
     }
 
-    bool erase(char *key) {
+    bool erase(const char *key) {
         uint32_t idx = get_key_hash(key);
         return erase(key, idx);
+    }
+
+    size_t size() {
+        return num_entries;
+    }
+
+    bool empty() {
+        return num_entries == 0;
     }
 
     /**
      * Compute the hash of a string, used to index into buckets.
      * Does not mod the result with the length of buckets.
      */
-    uint32_t get_key_hash(char *key) {
+    static uint32_t get_key_hash(const char *key) {
         uint32_t idx;
         murmurhash3_32(key, strlen(key), MURMURHASH_SEED, &idx);
 
@@ -146,11 +164,19 @@ template <typename T> class hash_map {
         T value;
         node *next;
 
-        node(char *k, T v) : key(k), value(v), next(nullptr) {}
+        node(const char *k, T v) : value(v), next(nullptr) {
+            size_t len = strlen(k);
+            key = (char *)malloc(sizeof(char) * (len + 1));
+            if (key == nullptr) {
+                throw std::bad_alloc();
+            }
+
+            strncpy(key, k, len + 1);
+        }
     };
 
     std::vector<node *> buckets;
-    int size;
+    int num_entries;
     double MAX_LOAD_FACTOR = 0.75;
 
     void rehash() {
@@ -160,7 +186,7 @@ template <typename T> class hash_map {
         for (size_t i = 0; i < buckets.size(); i++) {
             buckets[i] = nullptr;
         }
-        size = 0;
+        num_entries = 0;
 
         for (node *curr : temp_buckets) {
             while (curr != nullptr) {

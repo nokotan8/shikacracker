@@ -1,5 +1,6 @@
 #include "charsets.hpp"
 #include "globals.hpp"
+#include "hash_map.hpp"
 #include "help.hpp"
 #include "mask_attack.hpp"
 #include "opencl_setup.hpp"
@@ -118,16 +119,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    concurrent_set<std::string> input_hashes;
+    hash_map<bool> input_hashes;
     std::string hash_or_hashfile = argv[argc - 2];
     std::ifstream hash_file(hash_or_hashfile);
     if (hash_file.is_open()) {
         std::string curr_line;
         while (std::getline(hash_file, curr_line)) {
-            input_hashes.insert(curr_line);
+            input_hashes.insert(curr_line.c_str(), true);
         }
     } else {
-        input_hashes.insert(hash_or_hashfile);
+        input_hashes.insert(hash_or_hashfile.c_str(), true);
     }
 
     opencl_setup();

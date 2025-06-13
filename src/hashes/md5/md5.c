@@ -1,8 +1,3 @@
-/**
- * MD5 Message-Digest Algorithm, following RFC 1321 available at:
- * https://www.rfc-editor.org/rfc/rfc1321
- */
-
 #include "md5.h"
 #include "../bitops.h"
 #include <assert.h>

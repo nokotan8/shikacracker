@@ -1,3 +1,12 @@
+/**
+ * MurmurHash3 non-cryptographic hash function. Modified from:
+ * https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+ * MurmurHash is released under the MIT license.
+ *
+ * Tweaked to be valid within an OpenCL kernel, where memcpy is not available.
+ * Only works correctly on little-endian systems.
+ */
+
 #ifndef INC_MURMURHASH3_H
 #define INC_MURMURHASH3_H
 

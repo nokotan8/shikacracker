@@ -2,6 +2,7 @@
  * Contains functions and macros for bit operations
  * commonly used in hashing algorithms.
  */
+
 #include <stddef.h>
 #include <stdint.h>
 

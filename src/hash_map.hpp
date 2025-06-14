@@ -1,8 +1,8 @@
 /**
  * Hash map implementation using MurmurHash3
  * as the hash function. Allows external computation
- * of the key hash when looking up and deleting elements
- * for better performance, especially with long strings.
+ * of the key hash for better performance, especially
+ * with long strings.
  *
  * Only supports char arrays (char *) as the key.
  */
@@ -40,8 +40,8 @@ template <typename T> class hash_map {
         }
     }
 
-    void insert(const char *key, T value) {
-        uint32_t bucket_idx = get_key_hash(key) % buckets.size();
+    void insert(const char *key, T value, uint32_t bucket_idx) {
+        bucket_idx %= buckets.size();
 
         node *curr = buckets[bucket_idx];
         while (curr != nullptr) {
@@ -62,6 +62,12 @@ template <typename T> class hash_map {
         if (load_factor > MAX_LOAD_FACTOR) {
             rehash();
         }
+    }
+
+    void insert(const char *key, T value) {
+        uint32_t bucket_idx = get_key_hash(key);
+
+        insert(key, value, bucket_idx);
     }
 
     bool exists(const char *key, uint32_t bucket_idx) const {
@@ -138,11 +144,11 @@ template <typename T> class hash_map {
         return erase(key, idx);
     }
 
-    size_t size() {
+    size_t size() const {
         return num_entries;
     }
 
-    bool empty() {
+    bool empty() const {
         return num_entries == 0;
     }
 
@@ -156,6 +162,52 @@ template <typename T> class hash_map {
 
         return idx;
     }
+
+  protected:
+    size_t num_buckets() const {
+        return buckets.size();
+    }
+
+    void rehash() {
+        std::vector<node *> temp_buckets = buckets;
+        buckets.resize(2 * temp_buckets.size());
+
+        for (size_t i = 0; i < buckets.size(); i++) {
+            buckets[i] = nullptr;
+        }
+        num_entries = 0;
+
+        for (node *curr : temp_buckets) {
+            while (curr != nullptr) {
+                insert(curr->key, curr->value);
+
+                node *tmp = curr;
+                curr = curr->next;
+                delete tmp;
+            }
+        }
+    }
+
+    void insert_no_rehash(const char *key, T value, uint32_t bucket_idx) {
+        bucket_idx %= buckets.size();
+
+        node *curr = buckets[bucket_idx];
+        while (curr != nullptr) {
+            if (strcmp(key, curr->key) == 0) {
+                curr->value = value;
+                return;
+            }
+            curr = curr->next;
+        }
+
+        node *new_node = new node(key, value);
+        new_node->next = buckets[bucket_idx];
+        buckets[bucket_idx] = new_node;
+
+        num_entries++;
+    }
+
+    double MAX_LOAD_FACTOR = 0.75;
 
   private:
     class node {
@@ -177,27 +229,6 @@ template <typename T> class hash_map {
 
     std::vector<node *> buckets;
     int num_entries;
-    double MAX_LOAD_FACTOR = 0.75;
-
-    void rehash() {
-        std::vector<node *> temp_buckets = buckets;
-        buckets.resize(2 * temp_buckets.size());
-
-        for (size_t i = 0; i < buckets.size(); i++) {
-            buckets[i] = nullptr;
-        }
-        num_entries = 0;
-
-        for (node *curr : temp_buckets) {
-            while (curr != nullptr) {
-                insert(curr->key, curr->value);
-
-                node *tmp = curr;
-                curr = curr->next;
-                delete tmp;
-            }
-        }
-    }
 };
 
 #endif // INC_HASH_MAP_H

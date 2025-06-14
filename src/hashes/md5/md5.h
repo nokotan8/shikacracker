@@ -3,6 +3,13 @@
  * https://www.rfc-editor.org/rfc/rfc1321
  */
 
+#ifndef INC_MD5_H
+#define INC_MD5_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,3 +44,9 @@ void md5_update(md5_context *ctx, uint8_t *input, size_t input_len);
  * store at least 16 elements.
  */
 void md5_final(md5_context *ctx, uint8_t *output);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // INC_MD5_H

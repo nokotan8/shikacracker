@@ -1,4 +1,3 @@
-
 unsigned int rotate_left32(const unsigned int x, const size_t n) {
     return (x << n) | (x >> (32 - n));
 }

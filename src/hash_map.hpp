@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <new>
 #include <stdint.h>
 #include <vector>
@@ -246,7 +247,7 @@ template <typename T> class hash_map {
 
     std::vector<node *> buckets;
     std::vector<short> bucket_status_;
-    int num_entries;
+    int num_entries = 0;
 };
 
 #endif // INC_HASH_MAP_H

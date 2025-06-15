@@ -10,9 +10,10 @@ __kernel void generate_from_mask_md5(
     const unsigned int pwd_length,                          // 5. length of each password candidate
     __constant const short *bucket_status,                  // 6. Whether each bucket in the host hash map is empty
     const unsigned int num_buckets,                         // 7. length of bucket_status
-    __global unsigned char *output,                         // 8. array to store hash output
+    __global char *output,                                  // 8. array to store hash output
     __global bool *output_status,                           // 9. whether the hash of the digest matches with an occupied bucket
-    const unsigned int block_size                           // 10. used to calculate offset into 8. and 9.
+    __global unsigned char *output_reverse,                 // 10. array of hash reverses
+    const unsigned int block_size                           // 11. used to calculate offset into 8. and 9.
 ) {
 
     size_t gid = get_global_id(0);
@@ -35,7 +36,7 @@ __kernel void generate_from_mask_md5(
     unsigned char output_raw[MD5_DIGEST_LEN];
     compute_md5(pwd_candidate, pwd_length, output_raw);
 
-    unsigned char output_hex[MD5_DIGEST_LEN * 2];
+    char output_hex[MD5_DIGEST_LEN * 2];
     char_to_hex(output_raw, output_hex, (unsigned int)MD5_DIGEST_LEN);
 
     unsigned int key;
@@ -43,8 +44,12 @@ __kernel void generate_from_mask_md5(
 
     size_t output_status_offset = gid % block_size;
     size_t output_offset =  output_status_offset * MD5_DIGEST_LEN * 2; // hash length = 16, double for hex
+    size_t output_reverse_offset = output_status_offset * pwd_length;
     output_status[output_status_offset] = bucket_status[key % num_buckets];
 
+    for (size_t i = 0; i < pwd_length; i++) {
+        output_reverse[i + output_reverse_offset] = pwd_candidate[i];
+    }
     for (size_t i = 0; i < MD5_DIGEST_LEN * 2; i++) {
         output[i + output_offset] = output_hex[i];
     }

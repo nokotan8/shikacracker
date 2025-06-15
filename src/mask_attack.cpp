@@ -13,7 +13,6 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
-#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
@@ -229,6 +228,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
     std::string kernel_code =
         get_file_contents("../src/opencl/bitops.cl") + "\n" +
         get_file_contents("../src/opencl/md5.cl") + "\n" +
+        get_file_contents("../src/opencl/murmurhash3.cl") + "\n" +
         get_file_contents("../src/opencl/mask_generate.cl");
 
     cl::Program program(context, kernel_code);
@@ -256,17 +256,29 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
     cl::Buffer charset_lengths_d(context,
                                  CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                  sizeof(cl_uint) * pwd_length, charset_lengths);
-    cl::Buffer pwd_first_half_d(context, CL_MEM_READ_WRITE,
+    cl::Buffer pwd_first_half_d(context, CL_MEM_READ_ONLY,
                                 sizeof(cl_uchar) * on_host_length);
+    cl::Buffer bucket_status_d(context, CL_MEM_READ_ONLY,
+                               sizeof(short) * input_hashes.num_buckets());
     cl::Buffer output_d(context, CL_MEM_WRITE_ONLY,
-                        sizeof(cl_uchar) * digest_size * block_size * 2);
+                        sizeof(cl_uchar) * block_size * digest_size * 2);
+    cl::Buffer output_status_d(context, CL_MEM_WRITE_ONLY,
+                               sizeof(bool) * block_size);
 
-    cl_uchar *output =
-        (cl_uchar *)malloc(sizeof(cl_uchar) * digest_size * block_size * 2);
+    cl_char *output =
+        (cl_char *)malloc(sizeof(cl_uchar) * digest_size * block_size * 2);
     if (output == nullptr) {
         free(charset_basis);
         free(charset_offsets);
         free(charset_lengths);
+        throw std::bad_alloc();
+    }
+    bool *output_status = (bool *)malloc(sizeof(bool) * block_size);
+    if (output_status == nullptr) {
+        free(charset_basis);
+        free(charset_offsets);
+        free(charset_lengths);
+        free(output);
         throw std::bad_alloc();
     }
 
@@ -275,10 +287,14 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         kernel.setArg(0, charset_basis_d);
         kernel.setArg(1, charset_offsets_d);
         kernel.setArg(2, charset_lengths_d);
+        kernel.setArg(3, pwd_first_half_d);
         kernel.setArg(4, on_host_length);
         kernel.setArg(5, pwd_length);
-        kernel.setArg(6, output_d);
-        kernel.setArg(7, block_size);
+        kernel.setArg(6, bucket_status_d);
+        kernel.setArg(7, (unsigned int)input_hashes.num_buckets());
+        kernel.setArg(8, output_d);
+        kernel.setArg(9, output_status_d);
+        kernel.setArg(10, block_size);
 
         while (input_hashes.empty() == false) {
             std::optional<std::string> input_str =
@@ -296,30 +312,41 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                 size_t num_hashes = block_end - block_offset;
 
                 queue.enqueueWriteBuffer(pwd_first_half_d, CL_TRUE, 0,
-                                         sizeof(cl_char) * on_host_length,
+                                         sizeof(char) * on_host_length,
                                          input_str.value().data());
-                kernel.setArg(3, pwd_first_half_d);
+
+                queue.enqueueWriteBuffer(bucket_status_d, CL_TRUE, 0,
+                                         sizeof(short) *
+                                             input_hashes.num_buckets(),
+                                         input_hashes.bucket_status().data());
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(block_offset),
                                            cl::NDRange(block_end));
+
+                queue.enqueueReadBuffer(output_status_d, CL_TRUE, 0,
+                                        sizeof(bool) * num_hashes,
+                                        output_status);
                 queue.enqueueReadBuffer(
                     output_d, CL_TRUE, 0,
                     sizeof(cl_char) * digest_size * num_hashes * 2, output);
 
                 std::string digest_hex(digest_size * 2, '\0');
                 for (size_t i = 0; i < num_hashes; i++) {
-                    size_t offset = i * digest_size * 2;
-                    memcpy(digest_hex.data(), output + offset, digest_size * 2);
+                    if (output_status[i]) {
+                        size_t offset = i * digest_size * 2;
+                        memcpy(digest_hex.data(), output + offset,
+                               digest_size * 2);
 
-                    if (input_hashes.exists(digest_hex.c_str())) {
-                        input_hashes.erase(digest_hex.c_str());
-                        std::string orig_string =
-                            input_str.value() +
-                            get_candidate(charset_basis, charset_offsets,
-                                          charset_lengths, block_offset + i,
-                                          pwd_length - on_host_length);
-                        fprintf(stdout, "Reverse of hash %s found: %s\n",
-                                digest_hex.c_str(), orig_string.c_str());
+                        if (input_hashes.exists(digest_hex.c_str())) {
+                            input_hashes.erase(digest_hex.c_str());
+                            std::string orig_string =
+                                input_str.value() +
+                                get_candidate(charset_basis, charset_offsets,
+                                              charset_lengths, block_offset + i,
+                                              pwd_length - on_host_length);
+                            fprintf(stdout, "Reverse of hash %s found: %s\n",
+                                    digest_hex.c_str(), orig_string.c_str());
+                        }
                     }
                 }
             }
@@ -333,6 +360,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
     gen_candidates_thread.join();
 
     free(output);
+    free(output_status);
     free(charset_basis);
     free(charset_offsets);
     free(charset_lengths);

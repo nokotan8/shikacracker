@@ -24,8 +24,9 @@
 
 template <typename T> class hash_map {
   public:
-    hash_map(size_t starting_buckets = 32) {
+    hash_map(size_t starting_buckets = 1024) {
         buckets = std::vector<node *>(starting_buckets, nullptr);
+        bucket_status_ = std::vector<short>(starting_buckets, false);
     }
 
     ~hash_map() {
@@ -54,11 +55,12 @@ template <typename T> class hash_map {
 
         node *new_node = new node(key, value);
         new_node->next = buckets[bucket_idx];
+
         buckets[bucket_idx] = new_node;
-
+        bucket_status_[bucket_idx] = true;
         num_entries++;
-        double load_factor = (1.0 * num_entries) / buckets.size();
 
+        double load_factor = (1.0 * num_entries) / buckets.size();
         if (load_factor > MAX_LOAD_FACTOR) {
             rehash();
         }
@@ -129,6 +131,10 @@ template <typename T> class hash_map {
                 delete curr;
                 num_entries--;
 
+                if (buckets[bucket_idx] == nullptr) {
+                    bucket_status_[bucket_idx] = false;
+                }
+
                 return true;
             }
 
@@ -152,6 +158,18 @@ template <typename T> class hash_map {
         return num_entries == 0;
     }
 
+    size_t num_buckets() const {
+        return buckets.size();
+    }
+
+    /**
+     * Returns a vector<short> of the same length as buckets,
+     * representing whether each bucket is empty or not.
+     */
+    const std::vector<short> bucket_status() const {
+        return bucket_status_;
+    }
+
     /**
      * Compute the hash of a string, used to index into buckets.
      * Does not mod the result with the length of buckets.
@@ -164,16 +182,14 @@ template <typename T> class hash_map {
     }
 
   protected:
-    size_t num_buckets() const {
-        return buckets.size();
-    }
-
     void rehash() {
         std::vector<node *> temp_buckets = buckets;
         buckets.resize(2 * temp_buckets.size());
+        bucket_status_.resize(2 * temp_buckets.size());
 
         for (size_t i = 0; i < buckets.size(); i++) {
             buckets[i] = nullptr;
+            bucket_status_[i] = false;
         }
         num_entries = 0;
 
@@ -202,8 +218,9 @@ template <typename T> class hash_map {
 
         node *new_node = new node(key, value);
         new_node->next = buckets[bucket_idx];
-        buckets[bucket_idx] = new_node;
 
+        buckets[bucket_idx] = new_node;
+        bucket_status_[bucket_idx] = true;
         num_entries++;
     }
 
@@ -228,6 +245,7 @@ template <typename T> class hash_map {
     };
 
     std::vector<node *> buckets;
+    std::vector<short> bucket_status_;
     int num_entries;
 };
 

@@ -144,3 +144,15 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+// std::vector<unsigned char> hex_to_bytes(const std::string &hex) {
+//     std::vector<unsigned char> bytes;
+//
+//     for (size_t i = 0; i < hex.length(); i += 2) {
+//         std::string byte_string = hex.substr(i, 2);
+//         uint8_t byte = std::stoul(byte_string, nullptr, 16);
+//         bytes.push_back(byte);
+//     }
+//
+//     return bytes;
+// }

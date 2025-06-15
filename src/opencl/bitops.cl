@@ -2,7 +2,7 @@ unsigned int rotate_left32(const unsigned int x, const size_t n) {
     return (x << n) | (x >> (32 - n));
 }
 
-void char_to_hex(__private unsigned char *input, __global unsigned char *output,
+void char_to_hex(unsigned char *input, unsigned char *output,
                  const unsigned int size) {
 
     for (unsigned int i = 0; i < size; i++) {

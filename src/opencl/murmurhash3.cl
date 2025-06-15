@@ -1,3 +1,5 @@
+#define MURMURHASH_SEED 12345
+
 static inline unsigned int fmix_32(unsigned int h) {
     h ^= h >> 16;
     h *= 0x85ebca6b;

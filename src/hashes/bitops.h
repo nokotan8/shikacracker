@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/**
- * Rotate x left by n positions.
- */
-uint32_t rotate_left32(const uint32_t x, const size_t n);
+#define rotate_left32(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+
+#define rotate_right32(x, n) (((x) >> (n)) | ((x) << (32 - (n))))

@@ -132,6 +132,7 @@ void sha256_process(sha256_context *ctx, uint8_t *input) {
     SHA256_ROUND(5,  d, e, f, g, h, a, b, c, tmp1);
     SHA256_ROUND(6,  c, d, e, f, g, h, a, b, tmp1);
     SHA256_ROUND(7,  b, c, d, e, f, g, h, a, tmp1);
+
     SHA256_ROUND(8,  a, b, c, d, e, f, g, h, tmp1);
     SHA256_ROUND(9,  h, a, b, c, d, e, f, g, tmp1);
     SHA256_ROUND(10, g, h, a, b, c, d, e, f, tmp1);
@@ -149,6 +150,7 @@ void sha256_process(sha256_context *ctx, uint8_t *input) {
     SHA256_ROUND(21, d, e, f, g, h, a, b, c, tmp1);
     SHA256_ROUND(22, c, d, e, f, g, h, a, b, tmp1);
     SHA256_ROUND(23, b, c, d, e, f, g, h, a, tmp1);
+
     SHA256_ROUND(24, a, b, c, d, e, f, g, h, tmp1);
     SHA256_ROUND(25, h, a, b, c, d, e, f, g, tmp1);
     SHA256_ROUND(26, g, h, a, b, c, d, e, f, tmp1);
@@ -166,6 +168,7 @@ void sha256_process(sha256_context *ctx, uint8_t *input) {
     SHA256_ROUND(37, d, e, f, g, h, a, b, c, tmp1);
     SHA256_ROUND(38, c, d, e, f, g, h, a, b, tmp1);
     SHA256_ROUND(39, b, c, d, e, f, g, h, a, tmp1);
+
     SHA256_ROUND(40, a, b, c, d, e, f, g, h, tmp1);
     SHA256_ROUND(41, h, a, b, c, d, e, f, g, tmp1);
     SHA256_ROUND(42, g, h, a, b, c, d, e, f, tmp1);
@@ -183,6 +186,7 @@ void sha256_process(sha256_context *ctx, uint8_t *input) {
     SHA256_ROUND(53, d, e, f, g, h, a, b, c, tmp1);
     SHA256_ROUND(54, c, d, e, f, g, h, a, b, tmp1);
     SHA256_ROUND(55, b, c, d, e, f, g, h, a, tmp1);
+
     SHA256_ROUND(56, a, b, c, d, e, f, g, h, tmp1);
     SHA256_ROUND(57, h, a, b, c, d, e, f, g, tmp1);
     SHA256_ROUND(58, g, h, a, b, c, d, e, f, tmp1);

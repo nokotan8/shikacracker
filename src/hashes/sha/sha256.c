@@ -4,20 +4,23 @@
 #include <stdio.h>
 #include <string.h>
 
+/* SHA256 operations */
 #define ch(x, y, z) (((x) & (y)) ^ (~(x) & (z)))
 #define maj(x, y, z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
 #define sigma0(x) (rotate_right32(x, 7) ^ rotate_right32(x, 18) ^ ((x) >> 3))
 #define sigma1(x) (rotate_right32(x, 17) ^ rotate_right32(x, 19) ^ ((x) >> 10))
-#define Sigma0(x) (rotate_right32(x, 2) ^ rotate_right32(x, 13) ^ rotate_right32(x, 22))
-#define Sigma1(x) (rotate_right32(x, 6) ^ rotate_right32(x, 11) ^ rotate_right32(x, 25))
+#define sum0(x) (rotate_right32(x, 2) ^ rotate_right32(x, 13) ^ rotate_right32(x, 22))
+#define sum1(x) (rotate_right32(x, 6) ^ rotate_right32(x, 11) ^ rotate_right32(x, 25))
 
+/* One round in the compression loop */
 #define SHA256_ROUND(i, a, b, c, d, e, f, g, h, tmp)                                               \
     {                                                                                              \
-        tmp = h + Sigma1(e) + ch(e, f, g) + k[i] + w[i];                                           \
-        h = Sigma0(a) + maj(a, b, c) + tmp;                                                        \
+        tmp = h + sum1(e) + ch(e, f, g) + k[i] + w[i];                                           \
+        h = sum0(a) + maj(a, b, c) + tmp;                                                        \
         d += tmp;                                                                                  \
     }
 
+/* Round constants */
 static const uint32_t k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -32,78 +35,14 @@ static const uint32_t k[64] = {
 void sha256_process(sha256_context *ctx, uint8_t *input) {
     uint32_t a, b, c, d, e, f, g, h, tmp1, w[64];
 
-    /* Unrolled loops for performance :) */
-    // for (int i = 0, j = 0; i < 16; i++, j += 4) {
-        // w[i] = (input[j] << 24) | (input[j + 1] << 16) | (input[j + 2] << 8) | (input[j + 3]);
-    // }
-    w[0]  = (input[0] << 24)  | (input[1] << 16)  | (input[2] << 8)  | (input[3]);
-    w[1]  = (input[4] << 24)  | (input[5] << 16)  | (input[6] << 8)  | (input[7]);
-    w[2]  = (input[8] << 24)  | (input[9] << 16)  | (input[10] << 8) | (input[11]);
-    w[3]  = (input[12] << 24) | (input[13] << 16) | (input[14] << 8) | (input[15]);
-    w[4]  = (input[16] << 24) | (input[17] << 16) | (input[18] << 8) | (input[19]);
-    w[5]  = (input[20] << 24) | (input[21] << 16) | (input[22] << 8) | (input[23]);
-    w[6]  = (input[24] << 24) | (input[25] << 16) | (input[26] << 8) | (input[27]);
-    w[7]  = (input[28] << 24) | (input[29] << 16) | (input[30] << 8) | (input[31]);
-    w[8]  = (input[32] << 24) | (input[33] << 16) | (input[34] << 8) | (input[35]);
-    w[9]  = (input[36] << 24) | (input[37] << 16) | (input[38] << 8) | (input[39]);
-    w[10] = (input[40] << 24) | (input[41] << 16) | (input[42] << 8) | (input[43]);
-    w[11] = (input[44] << 24) | (input[45] << 16) | (input[46] << 8) | (input[47]);
-    w[12] = (input[48] << 24) | (input[49] << 16) | (input[50] << 8) | (input[51]);
-    w[13] = (input[52] << 24) | (input[53] << 16) | (input[54] << 8) | (input[55]);
-    w[14] = (input[56] << 24) | (input[57] << 16) | (input[58] << 8) | (input[59]);
-    w[15] = (input[60] << 24) | (input[61] << 16) | (input[62] << 8) | (input[63]);
+    // Copy message into w[0..15]
+    for (int i = 0, j = 0; i < 16; i++, j += 4) {
+        w[i] = (input[j] << 24) | (input[j + 1] << 16) | (input[j + 2] << 8) | (input[j + 3]);
+    }
 
-    // for (int i = 16; i < 64; i++) {
-    //     w[i] = sigma1(w[i - 2]) + w[i - 7] + sigma0(w[i - 15]) + w[i - 16];
-    // }
-    w[16] = sigma1(w[14]) + w[9]  + sigma0(w[1])  + w[0];
-    w[17] = sigma1(w[15]) + w[10] + sigma0(w[2])  + w[1];
-    w[18] = sigma1(w[16]) + w[11] + sigma0(w[3])  + w[2];
-    w[19] = sigma1(w[17]) + w[12] + sigma0(w[4])  + w[3];
-    w[20] = sigma1(w[18]) + w[13] + sigma0(w[5])  + w[4];
-    w[21] = sigma1(w[19]) + w[14] + sigma0(w[6])  + w[5];
-    w[22] = sigma1(w[20]) + w[15] + sigma0(w[7])  + w[6];
-    w[23] = sigma1(w[21]) + w[16] + sigma0(w[8])  + w[7];
-    w[24] = sigma1(w[22]) + w[17] + sigma0(w[9])  + w[8];
-    w[25] = sigma1(w[23]) + w[18] + sigma0(w[10]) + w[9];
-    w[26] = sigma1(w[24]) + w[19] + sigma0(w[11]) + w[10];
-    w[27] = sigma1(w[25]) + w[20] + sigma0(w[12]) + w[11];
-    w[28] = sigma1(w[26]) + w[21] + sigma0(w[13]) + w[12];
-    w[29] = sigma1(w[27]) + w[22] + sigma0(w[14]) + w[13];
-    w[30] = sigma1(w[28]) + w[23] + sigma0(w[15]) + w[14];
-    w[31] = sigma1(w[29]) + w[24] + sigma0(w[16]) + w[15];
-    w[32] = sigma1(w[30]) + w[25] + sigma0(w[17]) + w[16];
-    w[33] = sigma1(w[31]) + w[26] + sigma0(w[18]) + w[17];
-    w[34] = sigma1(w[32]) + w[27] + sigma0(w[19]) + w[18];
-    w[35] = sigma1(w[33]) + w[28] + sigma0(w[20]) + w[19];
-    w[36] = sigma1(w[34]) + w[29] + sigma0(w[21]) + w[20];
-    w[37] = sigma1(w[35]) + w[30] + sigma0(w[22]) + w[21];
-    w[38] = sigma1(w[36]) + w[31] + sigma0(w[23]) + w[22];
-    w[39] = sigma1(w[37]) + w[32] + sigma0(w[24]) + w[23];
-    w[40] = sigma1(w[38]) + w[33] + sigma0(w[25]) + w[24];
-    w[41] = sigma1(w[39]) + w[34] + sigma0(w[26]) + w[25];
-    w[42] = sigma1(w[40]) + w[35] + sigma0(w[27]) + w[26];
-    w[43] = sigma1(w[41]) + w[36] + sigma0(w[28]) + w[27];
-    w[44] = sigma1(w[42]) + w[37] + sigma0(w[29]) + w[28];
-    w[45] = sigma1(w[43]) + w[38] + sigma0(w[30]) + w[29];
-    w[46] = sigma1(w[44]) + w[39] + sigma0(w[31]) + w[30];
-    w[47] = sigma1(w[45]) + w[40] + sigma0(w[32]) + w[31];
-    w[48] = sigma1(w[46]) + w[41] + sigma0(w[33]) + w[32];
-    w[49] = sigma1(w[47]) + w[42] + sigma0(w[34]) + w[33];
-    w[50] = sigma1(w[48]) + w[43] + sigma0(w[35]) + w[34];
-    w[51] = sigma1(w[49]) + w[44] + sigma0(w[36]) + w[35];
-    w[52] = sigma1(w[50]) + w[45] + sigma0(w[37]) + w[36];
-    w[53] = sigma1(w[51]) + w[46] + sigma0(w[38]) + w[37];
-    w[54] = sigma1(w[52]) + w[47] + sigma0(w[39]) + w[38];
-    w[55] = sigma1(w[53]) + w[48] + sigma0(w[40]) + w[39];
-    w[56] = sigma1(w[54]) + w[49] + sigma0(w[41]) + w[40];
-    w[57] = sigma1(w[55]) + w[50] + sigma0(w[42]) + w[41];
-    w[58] = sigma1(w[56]) + w[51] + sigma0(w[43]) + w[42];
-    w[59] = sigma1(w[57]) + w[52] + sigma0(w[44]) + w[43];
-    w[60] = sigma1(w[58]) + w[53] + sigma0(w[45]) + w[44];
-    w[61] = sigma1(w[59]) + w[54] + sigma0(w[46]) + w[45];
-    w[62] = sigma1(w[60]) + w[55] + sigma0(w[47]) + w[46];
-    w[63] = sigma1(w[61]) + w[56] + sigma0(w[48]) + w[47];
+    for (int i = 16; i < 64; i++) {
+        w[i] = sigma1(w[i - 2]) + w[i - 7] + sigma0(w[i - 15]) + w[i - 16];
+    }
 
     a = ctx->state[0];
     b = ctx->state[1];
@@ -114,88 +53,19 @@ void sha256_process(sha256_context *ctx, uint8_t *input) {
     g = ctx->state[6];
     h = ctx->state[7];
 
-    // for (int i = 0; i < 64; i += 8) {
-    //     SHA256_ROUND(i + 0, a, b, c, d, e, f, g, h, tmp1);
-    //     SHA256_ROUND(i + 1, h, a, b, c, d, e, f, g, tmp1);
-    //     SHA256_ROUND(i + 2, g, h, a, b, c, d, e, f, tmp1);
-    //     SHA256_ROUND(i + 3, f, g, h, a, b, c, d, e, tmp1);
-    //     SHA256_ROUND(i + 4, e, f, g, h, a, b, c, d, tmp1);
-    //     SHA256_ROUND(i + 5, d, e, f, g, h, a, b, c, tmp1);
-    //     SHA256_ROUND(i + 6, c, d, e, f, g, h, a, b, tmp1);
-    //     SHA256_ROUND(i + 7, b, c, d, e, f, g, h, a, tmp1);
-    // }
-    SHA256_ROUND(0,  a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(1,  h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(2,  g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(3,  f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(4,  e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(5,  d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(6,  c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(7,  b, c, d, e, f, g, h, a, tmp1);
+    // Compression function loop
+    for (int i = 0; i < 64; i += 8) {
+        SHA256_ROUND(i + 0, a, b, c, d, e, f, g, h, tmp1);
+        SHA256_ROUND(i + 1, h, a, b, c, d, e, f, g, tmp1);
+        SHA256_ROUND(i + 2, g, h, a, b, c, d, e, f, tmp1);
+        SHA256_ROUND(i + 3, f, g, h, a, b, c, d, e, tmp1);
+        SHA256_ROUND(i + 4, e, f, g, h, a, b, c, d, tmp1);
+        SHA256_ROUND(i + 5, d, e, f, g, h, a, b, c, tmp1);
+        SHA256_ROUND(i + 6, c, d, e, f, g, h, a, b, tmp1);
+        SHA256_ROUND(i + 7, b, c, d, e, f, g, h, a, tmp1);
+    }
 
-    SHA256_ROUND(8,  a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(9,  h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(10, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(11, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(12, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(13, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(14, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(15, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(16, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(17, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(18, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(19, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(20, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(21, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(22, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(23, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(24, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(25, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(26, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(27, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(28, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(29, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(30, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(31, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(32, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(33, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(34, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(35, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(36, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(37, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(38, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(39, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(40, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(41, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(42, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(43, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(44, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(45, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(46, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(47, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(48, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(49, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(50, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(51, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(52, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(53, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(54, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(55, b, c, d, e, f, g, h, a, tmp1);
-
-    SHA256_ROUND(56, a, b, c, d, e, f, g, h, tmp1);
-    SHA256_ROUND(57, h, a, b, c, d, e, f, g, tmp1);
-    SHA256_ROUND(58, g, h, a, b, c, d, e, f, tmp1);
-    SHA256_ROUND(59, f, g, h, a, b, c, d, e, tmp1);
-    SHA256_ROUND(60, e, f, g, h, a, b, c, d, tmp1);
-    SHA256_ROUND(61, d, e, f, g, h, a, b, c, tmp1);
-    SHA256_ROUND(62, c, d, e, f, g, h, a, b, tmp1);
-    SHA256_ROUND(63, b, c, d, e, f, g, h, a, tmp1);
-
+    // Add processed data to the hash value
     ctx->state[0] += a;
     ctx->state[1] += b;
     ctx->state[2] += c;

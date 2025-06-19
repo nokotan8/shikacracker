@@ -17,7 +17,6 @@ add_executable(${PROJECT_NAME}
     src/charsets.cpp
     src/opencl_setup.cpp
     src/hashes/murmurhash3/murmurhash3.c
-    src/hashes/bitops.c
 )
 
 target_link_libraries(${PROJECT_NAME}     

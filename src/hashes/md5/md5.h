@@ -24,9 +24,9 @@ typedef struct {
 
 /**
  * Initialize MD5 context. This should be called after
- * initialising ctx. If ctx was used previously, this
+ * instantiating ctx. If ctx was used previously, this
  * this should also be called before reusing ctx for a
- * new MD5 hash.
+ * new hash.
  */
 void md5_init(md5_context *ctx);
 

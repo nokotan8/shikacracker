@@ -13,12 +13,30 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
+#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+
+void print_progress(int width, float progress, std::string text = "") {
+    std::cout << '\r' << text << "[";
+
+    int divide = width * progress;
+    for (int i = 0; i < width; i++) {
+        if (i < divide)
+            std::cout << "-";
+        else if (i == divide)
+            std::cout << "c";
+        else
+            std::cout << " ";
+    }
+
+    std::cout << "] " << int(progress * 100.0) << " %" << std::flush;
+}
 
 size_t parse_mask(const std::string &mask, unsigned char **charset,
                   unsigned int **charset_offsets,
@@ -188,6 +206,10 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
     for (cl_uint i = on_host_length; i < pwd_length; i++) {
         charset_space_size *= charset_lengths[i];
     }
+    size_t masks_to_process = 1;
+    for (cl_uint i = 0; i < on_host_length; i++) {
+        masks_to_process *= charset_lengths[i];
+    }
 
     // Stores half-generated candidates
     entry_buffer<std::vector<cl_uchar>> candidate_buffer(10);
@@ -275,11 +297,15 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         kernel.setArg(10, output_reverse_d);
         kernel.setArg(11, block_size);
 
+        size_t masks_processed = 0;
+        std::unordered_map<std::string, std::vector<cl_uchar>> cracked_hashes;
         while (input_hashes.empty() == false) {
             std::optional<std::vector<cl_uchar>> input_str =
                 candidate_buffer.remove_item();
             if (input_str == std::nullopt)
                 break;
+
+            print_progress(80, masks_processed * 1.0 / masks_to_process);
 
             size_t block_offset = 0;
             size_t num_blocks =
@@ -323,7 +349,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                                 output_reverse_d, CL_TRUE, i * pwd_length,
                                 sizeof(cl_uchar) * pwd_length,
                                 orig_string.data());
-                            fprintf(stdout, "Reverse of hash %s found: %s\n",
+                            fprintf(stdout, "\nReverse of hash %s found: %s\n",
                                     digest_hex.c_str(), orig_string.data());
 
                             input_hashes.erase(digest_hex.c_str());
@@ -331,10 +357,13 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                     }
                 }
             }
+            masks_processed++;
         }
     } catch (cl::Error &err) {
         fprintf(stderr, "error: %s\n", err.what());
     }
+
+    std::cout << '\n';
 
     candidate_buffer.finished_add();
 

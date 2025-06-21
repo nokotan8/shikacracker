@@ -1,21 +1,6 @@
 #include <CL/opencl.hpp>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
-
-std::string get_file_contents(const std::filesystem::path filename) {
-    std::ifstream in(filename, std::ios::in | std::ios::binary);
-    if (in) {
-        std::ostringstream contents;
-        contents << in.rdbuf();
-        in.close();
-        return (contents.str());
-    } else {
-        return "";
-    }
-}
 
 int opencl_setup() {
     std::vector<cl::Platform> platforms;

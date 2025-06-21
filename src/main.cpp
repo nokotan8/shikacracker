@@ -3,6 +3,7 @@
 #include "hash_map.hpp"
 #include "help.hpp"
 #include "mask_attack.hpp"
+#include "modes.hpp"
 #include "opencl_setup.hpp"
 
 #include <cstdio>
@@ -135,8 +136,12 @@ int main(int argc, char *argv[]) {
 
     if (atk_mode == 3) { // Mask attack
         const std::string mask = argv[argc - 1];
+        std::string kernel_fn_name;
+        size_t digest_len;
+        const std::string kernel_code =
+            get_mask_kernel(hash_mode, kernel_fn_name, &digest_len);
         try {
-            mask_attack(mask, input_hashes, "generate_from_mask_md5");
+            mask_attack(mask, input_hashes, digest_len, kernel_fn_name, kernel_code);
         } catch (std::invalid_argument &err) {
             fprintf(stderr, "Error: %s\n", err.what());
         }
@@ -144,15 +149,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
-// std::vector<unsigned char> hex_to_bytes(const std::string &hex) {
-//     std::vector<unsigned char> bytes;
-//
-//     for (size_t i = 0; i < hex.length(); i += 2) {
-//         std::string byte_string = hex.substr(i, 2);
-//         uint8_t byte = std::stoul(byte_string, nullptr, 16);
-//         bytes.push_back(byte);
-//     }
-//
-//     return bytes;
-// }

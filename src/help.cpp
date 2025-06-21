@@ -31,7 +31,7 @@ void print_help_hash() {
     fprintf(stdout, "Hash types:\n"
                     "  0\tMD5\n"
                     // "  1\tSHA1\n"
-                    // "  2\tSHA256\n"
+                    "  2\tSHA256\n"
                     // "  3\tSHA512\n"
             );
 }

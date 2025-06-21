@@ -75,8 +75,10 @@ to the [cpu-only](https://github.com/nokotan8/shikacracker/tree/cpu-only) branch
 ## Supported Hashes
 
 - MD5
+- SHA256
 
-That's it. Sorry, my bad. I'm working on SHA1 and SHA256 I promise.
+Working on:
+- SHA1
 
 ## Performance & Benchmarks
 

@@ -200,7 +200,7 @@ void sha256_process(sha256_context *ctx, unsigned char *input) {
 }
 
 void sha256_init(sha256_context *ctx) {
-    ctx->size = (uint64_t)0;
+    ctx->size = (unsigned long)0;
 
     ctx->state[0] = 0x6a09e667;
     ctx->state[1] = 0xbb67ae85;
@@ -213,8 +213,8 @@ void sha256_init(sha256_context *ctx) {
 }
 
 void sha256_update(sha256_context *ctx, const unsigned char *input, size_t input_len) {
-    uint64_t offset = ctx->size % 64;
-    ctx->size += (uint64_t)input_len;
+    unsigned long offset = ctx->size % 64;
+    ctx->size += (unsigned long)input_len;
 
     for (size_t i = 0; i < input_len; i++) {
         ctx->input[offset++] = input[i];
@@ -227,7 +227,7 @@ void sha256_update(sha256_context *ctx, const unsigned char *input, size_t input
 }
 
 void sha256_final(sha256_context *ctx, unsigned char *output) {
-    uint64_t offset = ctx->size % 64;
+    unsigned long offset = ctx->size % 64;
     ctx->input[offset++] = (unsigned char)0x80;
 
     if (offset > 56) {
@@ -243,7 +243,7 @@ void sha256_final(sha256_context *ctx, unsigned char *output) {
         ctx->input[offset++] = (unsigned char)0x00;
     }
 
-    uint64_t len_bits = ctx->size * 8;
+    unsigned long len_bits = ctx->size * 8;
     ctx->input[56] = (unsigned char)(len_bits >> 56);
     ctx->input[57] = (unsigned char)(len_bits >> 48);
     ctx->input[58] = (unsigned char)(len_bits >> 40);
@@ -265,4 +265,12 @@ void sha256_final(sha256_context *ctx, unsigned char *output) {
         output[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff;
         output[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff;
     }
+}
+
+void compute_sha256(const unsigned char *input, const unsigned int input_len,
+                 __private unsigned char *output) {
+    sha256_context ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, input, input_len);
+    sha256_final(&ctx, output);
 }

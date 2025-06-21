@@ -11,9 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <functional>
-#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
@@ -23,19 +21,24 @@
 #include <vector>
 
 void print_progress(int width, float progress, std::string text = "") {
-    std::cout << '\r' << text << "[";
+    fflush(stdout);
+    if (text.empty()) {
+        fprintf(stdout, "\r[");
+    } else {
+        fprintf(stdout, "\r%s [", text.c_str());
+    }
 
     int divide = width * progress;
     for (int i = 0; i < width; i++) {
         if (i < divide)
-            std::cout << "-";
+            fprintf(stdout, "-");
         else if (i == divide)
-            std::cout << "c";
+            fprintf(stdout, "c");
         else
-            std::cout << " ";
+            fprintf(stdout, " ");
     }
 
-    std::cout << "] " << int(progress * 100.0) << " %" << std::flush;
+    fprintf(stdout, "] %.1f%%", progress * 100);
 }
 
 size_t parse_mask(const std::string &mask, unsigned char **charset,
@@ -180,7 +183,8 @@ void generate_candidates(
  * https://hashcat.net/wiki/doku.php?id=mask_attack
  */
 void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
-                 std::string kernel_fn_name) {
+                 size_t digest_len, const std::string &kernel_fn_name,
+                 const std::string &kernel_code) {
     cl_uchar *charset_basis = nullptr;
     cl_uint *charset_offsets = nullptr;
     cl_uint *charset_lengths = nullptr;
@@ -198,16 +202,19 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         return;
     }
 
-    cl_uint on_host_length = pwd_length / 2;
+    cl_uint on_host_len = pwd_length / 2;
+    if (on_host_len == 0) {
+        on_host_len++;
+    }
 
     // # of candidates that will be generated from each
     // half-computed mask
     size_t charset_space_size = 1;
-    for (cl_uint i = on_host_length; i < pwd_length; i++) {
+    for (cl_uint i = on_host_len; i < pwd_length; i++) {
         charset_space_size *= charset_lengths[i];
     }
     size_t masks_to_process = 1;
-    for (cl_uint i = 0; i < on_host_length; i++) {
+    for (cl_uint i = 0; i < on_host_len; i++) {
         masks_to_process *= charset_lengths[i];
     }
 
@@ -215,19 +222,12 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
     entry_buffer<std::vector<cl_uchar>> candidate_buffer(10);
     std::thread gen_candidates_thread(
         generate_candidates, std::ref(candidate_buffer), charset_basis,
-        charset_offsets, charset_lengths, on_host_length);
+        charset_offsets, charset_lengths, on_host_len);
 
     cl_uint block_size = std::min(charset_space_size, (size_t)4096 * 64);
-    size_t digest_size = 16;
 
     cl::Context context(cl::Device::getDefault());
     cl::CommandQueue queue(context, cl::Device::getDefault());
-
-    std::string kernel_code =
-        get_file_contents("../src/opencl/bitops.cl") + "\n" +
-        get_file_contents("../src/opencl/md5.cl") + "\n" +
-        get_file_contents("../src/opencl/murmurhash3.cl") + "\n" +
-        get_file_contents("../src/opencl/mask_generate.cl");
 
     cl::Program program(context, kernel_code);
     try {
@@ -255,18 +255,18 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                                  CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                  sizeof(cl_uint) * pwd_length, charset_lengths);
     cl::Buffer pwd_first_half_d(context, CL_MEM_READ_ONLY,
-                                sizeof(cl_uchar) * on_host_length);
+                                sizeof(cl_uchar) * on_host_len);
     cl::Buffer bucket_status_d(context, CL_MEM_READ_ONLY,
                                sizeof(short) * input_hashes.num_buckets());
     cl::Buffer output_d(context, CL_MEM_WRITE_ONLY,
-                        sizeof(cl_char) * block_size * digest_size * 2);
+                        sizeof(cl_char) * block_size * digest_len * 2);
     cl::Buffer output_status_d(context, CL_MEM_WRITE_ONLY,
                                sizeof(bool) * block_size);
     cl::Buffer output_reverse_d(context, CL_MEM_WRITE_ONLY,
                                 sizeof(cl_uchar) * block_size * pwd_length);
 
     cl_char *output =
-        (cl_char *)malloc(sizeof(cl_char) * digest_size * block_size * 2);
+        (cl_char *)malloc(sizeof(cl_char) * digest_len * block_size * 2);
     if (output == nullptr) {
         free(charset_basis);
         free(charset_offsets);
@@ -288,7 +288,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         kernel.setArg(1, charset_offsets_d);
         kernel.setArg(2, charset_lengths_d);
         kernel.setArg(3, pwd_first_half_d);
-        kernel.setArg(4, on_host_length);
+        kernel.setArg(4, on_host_len);
         kernel.setArg(5, pwd_length);
         kernel.setArg(6, bucket_status_d);
         kernel.setArg(7, (unsigned int)input_hashes.num_buckets());
@@ -317,7 +317,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                 size_t num_hashes = block_end - block_offset;
 
                 queue.enqueueWriteBuffer(pwd_first_half_d, CL_TRUE, 0,
-                                         sizeof(cl_uchar) * on_host_length,
+                                         sizeof(cl_uchar) * on_host_len,
                                          input_str.value().data());
 
                 queue.enqueueWriteBuffer(bucket_status_d, CL_TRUE, 0,
@@ -333,16 +333,16 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
                                         output_status);
                 queue.enqueueReadBuffer(
                     output_d, CL_TRUE, 0,
-                    sizeof(cl_char) * digest_size * num_hashes * 2, output);
+                    sizeof(cl_char) * digest_len * num_hashes * 2, output);
 
-                std::string digest_hex(digest_size * 2, '\0');
+                std::string digest_hex(digest_len * 2, '\0');
                 std::vector<unsigned char> orig_string(pwd_length + 1);
                 orig_string.back() = '\0';
                 for (size_t i = 0; i < num_hashes; i++) {
                     if (output_status[i]) {
-                        size_t offset = i * digest_size * 2;
+                        size_t offset = i * digest_len * 2;
                         memcpy(digest_hex.data(), output + offset,
-                               digest_size * 2);
+                               digest_len * 2);
 
                         if (input_hashes.exists(digest_hex.c_str())) {
                             queue.enqueueReadBuffer(
@@ -363,7 +363,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         fprintf(stderr, "error: %s\n", err.what());
     }
 
-    std::cout << '\n';
+    fprintf(stdout, "\n");
 
     candidate_buffer.finished_add();
 

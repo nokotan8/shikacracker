@@ -16,6 +16,7 @@ add_executable(${PROJECT_NAME}
     src/mask_attack.cpp
     src/charsets.cpp
     src/opencl_setup.cpp
+    src/modes.cpp
     src/hashes/murmurhash3/murmurhash3.c
 )
 

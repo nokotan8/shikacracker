@@ -1,5 +1,5 @@
 #include "charsets.hpp"
-#include "globals.hpp"
+#include "flags.hpp"
 #include "hash_map.hpp"
 #include "help.hpp"
 #include "mask_attack.hpp"
@@ -20,10 +20,6 @@ enum help_types {
 };
 
 int quiet_flag = 0;
-int num_threads = 2;
-int hash_mode = -1;
-int atk_mode = -1;
-std::string dict;
 
 int main(int argc, char *argv[]) {
     int opt_char;
@@ -44,6 +40,10 @@ int main(int argc, char *argv[]) {
         {0, 0, 0, 0}
 
     };
+
+    int hash_type = -1;
+    int atk_mode = -1;
+
     while (1) {
         int opt_index = 0;
         opt_char = getopt_long(argc, argv, "hqm:a:t:c:1:2:3:4:", long_opts,
@@ -72,11 +72,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'm':
                 try {
-                    hash_mode = std::stoi(optarg);
-                    if (hash_mode < 0) {
-                        fprintf(stderr, "Argument to -m must be 0 or more\n");
-                        return 1;
-                    }
+                    hash_type = std::stoi(optarg);
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -m must be an integer\n");
                     return 1;
@@ -85,28 +81,12 @@ int main(int argc, char *argv[]) {
             case 'a':
                 try {
                     atk_mode = std::stoi(optarg);
-                    if (atk_mode < 0) {
-                        fprintf(stderr, "Argument to -a must be 0 or more\n");
-                        return 1;
-                    }
                 } catch (std::exception &err) {
                     fprintf(stderr, "Argument to -a must be an integer\n");
                     return 1;
                 }
                 break;
-            case 't':
-                try {
-                    num_threads = std::stoi(optarg);
-                    if (num_threads < 1) {
-                        fprintf(stderr, "Argument to -t must be 1 or more\n");
-                        return 1;
-                    }
-                } catch (std::exception &err) {
-                    fprintf(stderr, "Argument to -t must be an integer\n");
-                    return 1;
-                }
-                break;
-            case 'f':
+            case 'c':
                 try {
                     std::filesystem::path freq_file = optarg;
                     order_charsets(freq_file);
@@ -118,6 +98,14 @@ int main(int argc, char *argv[]) {
             default:
                 abort();
         }
+    }
+    if (hash_type < 0) {
+        fprintf(stderr, "Please provide a valid argument to -m");
+        return 1;
+    }
+    if (atk_mode < 0) {
+        fprintf(stderr, "Please provide a valid argument to -a");
+        return 1;
     }
 
     hash_map<bool> input_hashes;
@@ -139,9 +127,10 @@ int main(int argc, char *argv[]) {
         std::string kernel_fn_name;
         size_t digest_len;
         const std::string kernel_code =
-            get_mask_kernel(hash_mode, kernel_fn_name, &digest_len);
+            get_mask_kernel(hash_type, kernel_fn_name, &digest_len);
         try {
-            mask_attack(mask, input_hashes, digest_len, kernel_fn_name, kernel_code);
+            mask_attack(mask, input_hashes, digest_len, kernel_fn_name,
+                        kernel_code);
         } catch (std::invalid_argument &err) {
             fprintf(stderr, "Error: %s\n", err.what());
         }

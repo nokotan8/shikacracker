@@ -1,7 +1,6 @@
 #include "mask_attack.hpp"
 #include "charsets.hpp"
 #include "entry_buffer.hpp"
-#include "globals.hpp"
 #include "hash_map.hpp"
 #include "opencl_setup.hpp"
 

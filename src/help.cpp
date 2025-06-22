@@ -1,5 +1,4 @@
 #include "help.hpp"
-#include "globals.hpp"
 #include <cstdio>
 #include <openssl/evp.h>
 
@@ -10,8 +9,8 @@ void print_help_general(char *arg0) {
         "dictionary|mask\n\n"
         "  -m, --hash-type\tType of hash to use.\n"
         "  -a, --attack-mode\tAttack mode, e.g. dictionary, mask, etc.\n"
-        "  -t, --threads\t\tNumber of threads to use for computing hashes "
-        "(default 2).\n"
+        // "  -t, --threads\t\tNumber of threads to use for computing hashes "
+        // "(default 2).\n"
         "  -c, --char-order\tFile that defines the character order in "
         "which password\n"
         "\t\t\tcandidates for mask attacks should be generated. It should\n"
@@ -22,25 +21,26 @@ void print_help_general(char *arg0) {
         "  -h, --help\t\tShow this help message and exit.\n"
         "      --help-hash\tShow a list of available hash types and exit.\n"
         "      --help-mode\tShow a list of available attack modes and exit.\n"
-        "      --help-mask\tShow information about how to format masks and "
-        "exit.\n",
+        "      --help-mask\tShow information about how to format masks and exit.\n",
         arg0);
 }
 
 void print_help_hash() {
-    fprintf(stdout, "Hash types:\n"
-                    "  0\tMD5\n"
-                    // "  1\tSHA1\n"
-                    "  2\tSHA256\n"
-                    // "  3\tSHA512\n"
-            );
+    fprintf(
+        stdout, "Hash types:\n"
+        "  0\tMD5\n"
+        // "  1\tSHA1\n"
+        "  2\tSHA256\n"
+        // "  3\tSHA512\n"
+    );
 }
 
 void print_help_mode() {
-    fprintf(stdout,
-            "Attack modes:\n"
-            // "  0\tDictionary\tHash a list of words specified from a file\n"
-            "  3\tMask\t\tGenerate candidates from a format string\n");
+    fprintf(
+        stdout,
+        "Attack modes:\n"
+        // "  0\tDictionary\tHash a list of words specified from a file\n"
+        "  3\tMask\t\tGenerate candidates from a format string\n");
 }
 
 void print_help_mask() {

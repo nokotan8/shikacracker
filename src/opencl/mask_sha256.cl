@@ -31,15 +31,21 @@ __kernel void generate_from_mask_sha256(
     size_t curr_idx = idx;
     unsigned char pwd_candidate[MAX_PWD_LEN];
 
+    size_t output_status_offset = gid % block_size;
+    size_t output_offset =  output_status_offset * SHA256_DIGEST_LEN * 2; // hash length = 16, double for hex
+    size_t output_reverse_offset = output_status_offset * pwd_length;
+
     for (int pos = (int)pwd_length - 1; pos >= (int)curr_length; pos--) {
         size_t len = charset_lengths[pos]; // # of items in charset_basis[pos] (if not flattened)
         size_t char_idx = curr_idx % len;  // index within charset_basis[pos]
         curr_idx /= len;
         pwd_candidate[pos] = charset_basis[charset_offsets[pos] + char_idx];
+        output_reverse[output_reverse_offset + pos] = pwd_candidate[pos];
     }
 
     for (size_t pos = 0; pos < curr_length; pos++) {
         pwd_candidate[pos] = pwd_first_half[pos];
+        output_reverse[output_reverse_offset + pos] = pwd_candidate[pos];
     }
 
     unsigned char output_raw[SHA256_DIGEST_LEN];
@@ -51,14 +57,8 @@ __kernel void generate_from_mask_sha256(
     unsigned int key;
     murmurhash3_32(output_hex, SHA256_DIGEST_LEN * 2, MURMURHASH_SEED, &key);
 
-    size_t output_status_offset = gid % block_size;
-    size_t output_offset =  output_status_offset * SHA256_DIGEST_LEN * 2; // hash length = 16, double for hex
-    size_t output_reverse_offset = output_status_offset * pwd_length;
     output_status[output_status_offset] = bucket_status[key % num_buckets];
 
-    for (size_t i = 0; i < pwd_length; i++) {
-        output_reverse[i + output_reverse_offset] = pwd_candidate[i];
-    }
     for (size_t i = 0; i < SHA256_DIGEST_LEN * 2; i++) {
         output[i + output_offset] = output_hex[i];
     }

@@ -24,9 +24,10 @@ void murmurhash3_32(const void *key, size_t len, unsigned int seed, void *output
 
         // this is only equivalent to the below
         // memcpy on little-endian systems
-        for (size_t j = 0; j < 4; j++) {
-            k1 |= (data[i * 4 + j] << (8 * j));
-        }
+        k1 |= (data[i * 4]);
+        k1 |= (data[i * 4 + 1] << (8));
+        k1 |= (data[i * 4 + 2] << (16));
+        k1 |= (data[i * 4 + 3] << (24));
         // memcpy(&k1, data + i * 4, 4);
 
         k1 *= c1;

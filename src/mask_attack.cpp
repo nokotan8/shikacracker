@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iostream>
 #include <new>
 #include <stdexcept>
 #include <string.h>
@@ -223,7 +224,7 @@ void mask_attack(const std::string &mask, hash_map<bool> &input_hashes,
         generate_candidates, std::ref(candidate_buffer), charset_basis,
         charset_offsets, charset_lengths, on_host_len);
 
-    cl_uint block_size = std::min(charset_space_size, (size_t)4096 * 64);
+    cl_uint block_size = std::min(charset_space_size, (size_t)4096 * 256);
 
     cl::Context context(cl::Device::getDefault());
     cl::CommandQueue queue(context, cl::Device::getDefault());

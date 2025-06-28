@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    hash_map<bool> input_hashes;
+    hash_map<bool> input_hashes(4096);
     std::string hash_or_hashfile = argv[argc - 2];
     std::ifstream hash_file(hash_or_hashfile);
     if (hash_file.is_open()) {

@@ -24,7 +24,7 @@
 
 template <typename value_type> class hash_map {
   public:
-    hash_map(size_t starting_buckets = 1024) {
+    hash_map(size_t starting_buckets = 32) {
         buckets_ = std::vector<node *>(starting_buckets, nullptr);
         bucket_status_ = std::vector<short>(starting_buckets, false);
     }
